@@ -1,4 +1,3 @@
-# postprocess.py
 import os
 import cv2
 import json
@@ -6,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 from datetime import datetime
-from config import CLASS_NAMES, COLORS, DEFAULT_CONFIG
+from Classifier.src.config import CLASS_NAMES, COLORS, DEFAULT_CONFIG
 
 def save_analysis_outputs(classification_results, stats, change_log, config, image_path, model_path):
     """

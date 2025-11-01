@@ -1,7 +1,7 @@
 # smoothing.py
 
 import numpy as np
-from config import CLASS_NAMES, CLASS_PRIORITY
+from Classifier.src.config import CLASS_NAMES, CLASS_PRIORITY
 
 
 def smooth_predictions(pred_grid, conf_grid, global_prob, confidence_thresh, neighborhood,

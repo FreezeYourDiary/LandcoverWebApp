@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Landcover Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .leaflet-pane.leaflet-labels-pane {
+        pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<script>
+  const map = L.map('map', {
+    center: [51.1, 17.0],
+    zoom: 7,
+    minZoom: 6,
+    maxZoom: 14,
+    zoomSnap: 1,
+    zoomDelta: 1,
+    wheelPxPerZoomLevel: 120,
+    maxBoundsViscosity: 1.0,
+  });
+
+  // --- : custom pane for labels TODO add border labels
+  map.createPane('labels');
+  map.getPane('labels').style.zIndex = 650;
+  map.getPane('labels').style.pointerEvents = 'none';
+
+  const satelliteLayer = L.tileLayer('/tiles/{z}/{x}/{y}.jpg', {
+    attribution: '© Satellite',
+    maxZoom: 14,
+  }).addTo(map);
+
+  const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+    attribution: '© CartoDB, © OpenStreetMap contributors',
+    opacity: 0.8,
+    pane: 'labels',
+  }).addTo(map);
+
+  // --- todo update borders geojson
+  async function addPolandBorders(map) {
+      try {
+          const response = await fetch('/static/poland_woj.json');
+          const polandGeoJson = await response.json();
+
+          L.geoJSON(polandGeoJson, {
+              style: function(feature) {
+                  return {
+                      color: 'yellow',
+                      weight: 2,
+                      opacity: 0.8,
+                      fillOpacity: 0
+                  };
+              }
+          }).addTo(map);
+
+      } catch (e) {
+          console.error("Could not load Poland GeoJSON borders:", e);
+      }
+  }
+    // after map loads
+  addPolandBorders(map);
+
+  const baseLayers = { "Satellite Imagery": satelliteLayer };
+  const overlays = { "City Names": labelOverlay };
+  L.control.layers(baseLayers, overlays).addTo(map);
+  let rectangle = null;
+  let startLatLng = null;
+
+  function onMapClick(e) {
+      if (!startLatLng) {
+          startLatLng = e.latlng;
+      } else {
+          const bounds = L.latLngBounds(startLatLng, e.latlng);
+          if (rectangle) rectangle.remove();
+          rectangle = L.rectangle(bounds, {color: "#ff7800", weight: 1}).addTo(map);
+          startLatLng = null;
+
+          const data = {
+              north: bounds.getNorth(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              west: bounds.getWest()
+          };
+          fetch("/analyze_area/", {
+              method: "POST",
+              headers: {"Content-Type": "application/json", "X-CSRFToken": "{{ csrf_token }}"},
+              body: JSON.stringify(data) // Fixed dup
+          }).then(resp => resp.json()).then(res => {
+              alert("Analysis started or loaded: " + JSON.stringify(res));
+          });
+      }
+  }
+
+  map.on('click', onMapClick);
+</script>
+</body>
+</html>

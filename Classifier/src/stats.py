@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 from scipy import ndimage as ndi
-from config import COLORS
+from Classifier.src.config import COLORS
 
 def compute_class_areas(classification_mask, class_names, pixel_size_m=10):
     """Returns area per class in km²."""

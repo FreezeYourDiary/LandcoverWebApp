@@ -1,0 +1,83 @@
+html, body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f4f4f9;
+  height: 100vh;
+  overflow: hidden;
+}
+#main-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: 100vh;
+}
+
+#map-pane {
+  position: relative;
+  border-right: 2px solid #ccc;
+  height: 100%;
+}
+#map {
+  height: 100%;
+}
+#results-pane {
+  padding: 20px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.leaflet-pane.leaflet-labels-pane {
+  pointer-events: none;
+}
+
+#preview {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 15px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: opacity 0.5s ease-in-out;
+}
+#statsOutput {
+  background: #e9ecef;
+  padding: 15px;
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  font-size: 0.9em;
+}
+
+dialog {
+  padding: 30px;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 400px;
+  max-width: 90%;
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+}
+.modal-controls {
+  margin-top: 20px;
+  text-align: right;
+}
+.modal-controls button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: background-color 0.3s;
+}
+#cancelBtn {
+  background: #ccc;
+}
+#runAnalyzeBtn {
+  background: #007bff;
+  color: white;
+}
+#runAnalyzeBtn:hover {
+  background: #0056b3;
+}
+

@@ -5,3 +5,4 @@ __pycache__/
 outputs/
 .idea/
 /data/
+db.sqlite3

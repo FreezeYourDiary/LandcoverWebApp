@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Klasyfikacja terenu{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app.css' %}">
+    {% block extra_css %}{% endblock extra_css %}
+</head>
+<body>
+    <div id="app-container">
+
+        <nav>
+            <a href="/">Analiza Landcover</a>
+            <a href="/">Analiza Wojewodzstwa</a>
+        </nav>
+
+
+        <main class="content">
+            {% block content %}
+            {% endblock content %}
+        </main>
+        
+
+        <footer>
+            &copy; 2025 GeoApp — Land Classification System
+        </footer>
+    </div>
+
+    {% block extra_js %}{% endblock extra_js %}
+
+</body>
+</html>

@@ -1,12 +1,10 @@
-# pipeline.py
 import os
-from classifier import classify_image, compute_global_context, load_classification_model
-from smoothing import smooth_predictions
-from postprocess import save_analysis_outputs  # Renamed import
-from stats import *
-from config import CLASS_NAMES, DEFAULT_CONFIG
-from utils.to_float import convert_to_float
-
+from Classifier.src.classifier import *
+from Classifier.src.smoothing import smooth_predictions
+from Classifier.src.postprocess import save_analysis_outputs  # Renamed import
+from Classifier.src.stats import *
+from Classifier.src.config import CLASS_NAMES, DEFAULT_CONFIG
+from Classifier.src.utils.convert import convert_to_float, to_serializable
 
 
 def run_analysis(image_path, model_path=None, options=None):
@@ -15,42 +13,41 @@ def run_analysis(image_path, model_path=None, options=None):
     handle classify + stats
     Returns (stats_dict, outputs_dict)
     """
+    # merging
     if options is None:
-        options = DEFAULT_CONFIG
+        options = {}
+    cfg = {**DEFAULT_CONFIG, **options}  # params to override defaults
 
-    model_path = model_path or options["MODEL_PATH"]
+    model_path = model_path or cfg["MODEL_PATH"]
     model = load_classification_model(model_path)
-
-    # ETAP KLASYFIKACJI
     results = classify_image(
         image_path=image_path,
         model=model,
-        img_size=options["IMG_SIZE"],
-        tile_size=options["TILE_SIZE"],
+        img_size=cfg["IMG_SIZE"],
+        tile_size=cfg["TILE_SIZE"],
         class_names=CLASS_NAMES
     )
     pred_grid = results["pred_grid"]
     conf_grid = results["conf_grid"]
     original = results["original"]
 
-    # ETAP KONTEKSTU GLOBALNEGO DO NAPRAWY
+    # globalny kontekst todo to be updated with new network
     global_prob = compute_global_context(results["pred_probs"])
     results["global_prob"] = global_prob
 
-    if options.get("APPLY_SMOOTHING", True):
+    if cfg.get("APPLY_SMOOTHING", True):
         pred_grid, change_log = smooth_predictions(
             pred_grid,
             conf_grid,
             global_prob,
-            confidence_thresh=options["CONF_THRESH"],
-            neighborhood=options["NEIGHBORHOOD"]
+            confidence_thresh=cfg["CONF_THRESH"],
+            neighborhood=cfg["NEIGHBORHOOD"]
         )
         results["pred_grid"] = pred_grid
     else:
         change_log = []
 
-    # Stats on the final (potentially smoothed) pred_grid z opcja bez
-    # ++ Rebuild mask from final grid
+    # Stats na końcowej siatce predykcji
     h, w, _ = original.shape
     tile_size = h // pred_grid.shape[0] if pred_grid.shape[0] > 0 else 0
     classification_mask = np.zeros((h, w, 3), dtype=np.uint8)
@@ -75,9 +72,10 @@ def run_analysis(image_path, model_path=None, options=None):
         classification_results=results,
         stats=stats,
         change_log=change_log,
-        config=options,
+        config=cfg,
         image_path=image_path,
         model_path=model_path
     )
 
-    return stats, outputs
+    return to_serializable(stats), to_serializable(outputs)
+

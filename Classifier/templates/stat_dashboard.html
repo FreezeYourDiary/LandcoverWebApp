@@ -1,0 +1,24 @@
+{#{% extends "base.html" %}#}
+{#{% block title %}Dashboard{% endblock %}#}
+{#{% block content %}#}
+{#<h2 class="text-2xl font-bold mb-4">Classification Results</h2>#}
+{##}
+{#<div x-data="{ open: null }">#}
+{#    {% for img in images %}#}
+{#    <div class="border rounded-xl shadow mb-4 bg-white p-4">#}
+{#        <div class="flex justify-between items-center">#}
+{#            <h3 class="font-semibold">{{ img.image_name }}</h3>#}
+{#            <button @click="open = (open === {{ forloop.counter }}) ? null : {{ forloop.counter }}"#}
+{#                class="text-blue-500 hover:underline">#}
+{#                Details#}
+{#            </button>#}
+{#        </div>#}
+{#        <div x-show="open === {{ forloop.counter }}" class="mt-2">#}
+{#            <img src="{{ img.figure_path }}" class="w-full rounded-lg mb-2">#}
+{#            <p>Mean confidence: {{ img.mean_confidence|floatformat:2 }}</p>#}
+{#            <pre class="text-sm bg-gray-100 p-2 rounded">{{ img.class_distribution|json_script:"stats"|safe }}</pre>#}
+{#        </div>#}
+{#    </div>#}
+{#    {% endfor %}#}
+{#</div>#}
+{#{% endblock %}#}

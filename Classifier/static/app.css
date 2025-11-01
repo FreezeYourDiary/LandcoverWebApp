@@ -1,0 +1,32 @@
+nav {
+    background: #2c3e50; /* Ciemny kolor tła */
+    color: white;
+    padding: 12px 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+nav a {
+    color: #ecf0f1;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+nav a:hover {
+    background-color: #34495e;
+    color: white;
+}
+
+footer {
+    background: #34495e;
+    color: #bdc3c7;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 0.85em;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+}

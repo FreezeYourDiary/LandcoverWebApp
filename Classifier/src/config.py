@@ -5,7 +5,8 @@ DEFAULT_CONFIG = {
     "CONF_THRESH": 0.6,
     "APPLY_SMOOTHING": True,
     "NEIGHBORHOOD": 3,
-    "OUTPUT_BASE_DIR": "outputs/results"
+    "OUTPUT_BASE_DIR": "outputs/results",
+    "MAP_PATH": "data/raw/satellite-2017-11-02_europe_poland.mbtiles"
 }
 
 CLASS_NAMES = [

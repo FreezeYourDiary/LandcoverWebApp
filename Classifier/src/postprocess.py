@@ -1,6 +1,8 @@
 import os
 import cv2
 import json
+import matplotlib
+matplotlib.use('Agg')  # backend stuck interface fix
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
@@ -93,7 +95,7 @@ def save_analysis_outputs(classification_results, stats, change_log, config, ima
     with open(metadata_json_path, "w") as f:
         json.dump(metadata, f, indent=4)
 
-    plt.figure(figsize=(16, 8))
+    fig = plt.figure(figsize=(16, 8))
 
     plt.subplot(1, 3, 1)
     plt.imshow(cv2.cvtColor(original, cv2.COLOR_BGR2RGB))
@@ -114,7 +116,7 @@ def save_analysis_outputs(classification_results, stats, change_log, config, ima
     plt.tight_layout(rect=[0, 0.1, 1, 1])
     plt.savefig(fig_path)
     # plt.show()
-    plt.close()
+    plt.close(fig)
 
     print(f"results in {base_dir}")
 

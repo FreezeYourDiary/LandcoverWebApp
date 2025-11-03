@@ -84,3 +84,20 @@ def compute_boundary_analysis(classification_mask, class_names):
             adjacency[c][c2] = adjacency[c][c2] / total if total > 0 else 0
 
     return adjacency
+
+def normalize_stats(stats: dict):
+    """round for json"""
+    def round_values(d):
+        return {k: round(v, 4) if isinstance(v, (int, float)) else v for k, v in d.items()}
+
+    clean = {
+        "areas_sq_km": round_values(stats.get("areas_sq_km", {})),
+        "areas_pct": round_values(stats.get("areas_pct", {})),
+        "fragmentation": round_values(stats.get("fragmentation_index", {})),
+        "adjacency": {
+            c1: round_values(c2dict)
+            for c1, c2dict in stats.get("adjacency_proportions", {}).items()
+        },
+        "density": round(stats.get("density_default", 0), 4),
+    }
+    return clean

@@ -18,7 +18,7 @@
 <script>
   const map = L.map('map', {
     center: [51.1, 17.0],
-    zoom: 7,
+    zoom: 8,
     minZoom: 6,
     maxZoom: 14,
     zoomSnap: 1,
@@ -46,14 +46,14 @@
   // --- todo update borders geojson
   async function addPolandBorders(map) {
       try {
-          const response = await fetch('/static/poland_woj.json');
+          const response = await fetch('/static/wojewodztwa-max.geojson');
           const polandGeoJson = await response.json();
 
           L.geoJSON(polandGeoJson, {
               style: function(feature) {
                   return {
-                      color: 'yellow',
-                      weight: 2,
+                      color: 'white',
+                      weight: 1,
                       opacity: 0.8,
                       fillOpacity: 0
                   };

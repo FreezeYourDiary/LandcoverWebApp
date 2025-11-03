@@ -1,30 +1,65 @@
+/* +spliter, tabs, stat download */
+
+/* to overwrite in js*/
+:root {
+    --map-width: 55%;
+    --results-width: 45%;
+}
+
 html, body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0;
   padding: 0;
-  background: #f4f4f9;
   height: 100vh;
+  background: #f4f4f9;
   overflow: hidden;
 }
+
+/* no text selection in dragging (reuse in city wide)*/
+.no-select {
+    user-select: none;
+    cursor: col-resize !important;
+}
 #main-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
   height: 100vh;
+  width: 100%;
 }
 
 #map-pane {
   position: relative;
-  border-right: 2px solid #ccc;
   height: 100%;
+  width: var(--map-width);
+  flex-shrink: 0;
 }
 #map {
   height: 100%;
 }
+
+
+#splitter {
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background-color: #ccc;
+    border-left: 1px solid #aaa;
+    border-right: 1px solid #aaa;
+    z-index: 1000;
+    flex-shrink: 0;
+}
+
 #results-pane {
   padding: 20px;
   overflow-y: auto;
   background: #fff;
+  width: var(--results-width);
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
+
+
+
+
 
 .leaflet-pane.leaflet-labels-pane {
   pointer-events: none;
@@ -34,16 +69,27 @@ html, body {
   max-width: 100%;
   border-radius: 8px;
   margin-top: 15px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   transition: opacity 0.5s ease-in-out;
 }
-#statsOutput {
-  background: #e9ecef;
-  padding: 15px;
+
+/* default for non-specific buttions */
+button {
+  padding: 8px 15px;
+  border: 1px solid #ccc;
   border-radius: 6px;
-  overflow-x: auto;
-  white-space: pre-wrap;
+  cursor: pointer;
+  background: #f0f0f0;
+  color: #333;
+  transition: background-color 0.2s, border-color 0.2s;
   font-size: 0.9em;
+}
+button:hover {
+  background: #e0e0e0;
+  border-color: #aaa;
+}
+button:active {
+    background: #d0d0d0;
 }
 
 dialog {
@@ -62,22 +108,152 @@ dialog::backdrop {
   margin-top: 20px;
   text-align: right;
 }
+
 .modal-controls button {
   padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
   margin-left: 10px;
-  transition: background-color 0.3s;
 }
 #cancelBtn {
   background: #ccc;
+  border: 1px solid #bbb;
 }
 #runAnalyzeBtn {
   background: #007bff;
   color: white;
+  border: 1px solid #007bff;
 }
 #runAnalyzeBtn:hover {
   background: #0056b3;
+  border-color: #0056b3;
 }
 
+#progressPanel {
+  margin-top: 15px;
+  font-family: monospace;
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+}
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  transition: color 0.2s ease;
+}
+.progress-step.done {
+  color: #4caf50;
+}
+.progress-step.active {
+  color: #007bff;
+  font-weight: 600;
+}
+.progress-step.pending {
+  color: #bbb;
+}
+
+#statsContainer {
+  margin-top: 12px;
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+#statsBars {
+  margin-top: 10px;
+}
+.bar {
+  height: 12px;
+  margin: 3px 0 10px;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.bar-label {
+  font-size: 0.85em;
+  margin-bottom: 2px;
+}
+
+#downloadJsonBtn, #viewRawJsonBtn {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: #565c63;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  border: none;
+}
+#downloadJsonBtn:hover, #viewRawJsonBtn:hover {
+  background: #125ea5;
+  border: none;
+}
+#statsContainer > div:first-child {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px; }
+
+
+#viewRawJsonBtn, #downloadJsonBtn {
+    margin-left: auto;
+}
+#viewRawJsonBtn {
+    margin-left: 0;
+}
+#tabsHeader {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  font-size: 0.85em;
+  padding: 6px 10px;
+}
+
+.tab-btn:hover {
+  background: #e8e8e8;
+}
+
+.tab-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+.simple-table td {
+  border-bottom: 1px solid #eee;
+  padding: 4px 6px;
+}
+.simple-table tr:nth-child(odd) td {
+  background: #fafafa;
+}
+
+.top-area-item {
+    padding: 4px 0;
+    font-size: 0.9em;
+    border-bottom: 1px dashed #eee;
+}
+.top-area-item:last-child {
+    border-bottom: none;
+}
+.top-area-item .rank {
+    font-weight: bold;
+    color: #007bff;
+    margin-right: 5px;
+}
+.show-all-btn {
+    margin-top: 10px;
+    width: 100%;
+}

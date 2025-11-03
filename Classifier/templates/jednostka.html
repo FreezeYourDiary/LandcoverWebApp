@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ city.display_name }} Statistics{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'jednostka.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+
+<div class="city-container">
+  <div class="city-header">
+    <h1>{{ city.display_name }}</h1>
+    <p>{{ title }}</p>
+  </div>
+
+  <div class="city-stats">
+    {% for key, value in stats.items %}
+    <div class="stat-card">
+      <h3>{{ key }}</h3>
+      <p>{{ value }}</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="map-section">
+    {% for m in maps %}
+      <h2 class="map-title">{{ m.title }}</h2>
+      <div id="map{{ forloop.counter }}" class="map-wrapper"></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  {% for m in maps %}
+    const map{{ forloop.counter }} = L.map('map{{ forloop.counter }}', {
+      center: [51.9194, 19.1451],
+      zoom: 7,
+      minZoom: 6,
+      maxZoom: 13,
+      maxBoundsViscosity: 1.0
+    });
+
+    L.tileLayer('{{ m.path }}', {
+      maxZoom: 13,
+      tms: true,
+      noWrap: true,
+      attribution: '© Satellite'
+    }).addTo(map{{ forloop.counter }});
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
+      opacity: 0.8,
+      pane: 'labels'
+    }).addTo(map{{ forloop.counter }});
+  {% endfor %}
+});
+</script>
+{% endblock extra_js %}

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 <link rel="stylesheet" href="{% static 'map.css' %}">
+
 {% endblock extra_css %}
 
 {% block content %}
@@ -14,188 +15,56 @@
     <div id="map-pane" class="map-pane">
       <div id="map"></div>
     </div>
-
+    <div id="splitter"></div>
     <div id="results-pane" class="results-pane">
-      <h2>Landcover Analysis Results</h2>
+      <h2>Analiza statystyczna wybranego obszaru</h2>
 
-      <h3>Statistics</h3>
-      <pre id="statsOutput">No analysis started. Draw an area on the map to begin.</pre>
+      <div id="progressPanel">
+          <h3 style="margin:0;">Progress</h3>
+        <div class="progress-step pending">wyodrębnianie kafelków mapy</div>
+        <div class="progress-step pending">przycinanie obszaru</div>
+        <div class="progress-step pending">analiza obszaru</div>
+        <div class="progress-step pending">zapis statystyk</div>
+      </div>
+
+      <div id="statsContainer">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h3 style="margin:0;">Statystyki</h3>
+    <button id="viewRawJsonBtn" style="margin-right: 1px;">
+        Raw
+    </button>
+    <button id="downloadJsonBtn">
+        Download JSON [⬇]
+    </button>
+  </div>
+
+  <div id="tabsHeader"></div>
+  <div id="statsBars">Analiza rozpocznie się po wybraniu strefy, którą chcesz przeanalizować na mapie.</div>
+</div>
 
       <h3>Preview</h3>
-      <img id="preview" alt="Result preview" style="display: none;"/>
+      <img id="preview" alt="Result preview" style="display: none; max-width:100%; border-radius:8px;"/>
     </div>
   </div>
 
   <dialog id="paramModal">
     <h3>Analysis Parameters</h3>
     <form id="paramForm">
-        <p><label>Tile size (px): <input id="tile_size" type="number" value="32"/></label></p>
-        <p><label>Image size (px): <input id="img_size" type="number" value="64"/></label></p>
-        <p><label>Apply smoothing: <input id="smoothing" type="checkbox" checked/></label></p>
+      <p><label>Tile size (px): <input id="tile_size" type="number" value="32"/></label></p>
+      <p><label>Image size (px): <input id="img_size" type="number" value="64"/></label></p>
+      <p><label>Apply smoothing: <input id="smoothing" type="checkbox" checked/></label></p>
     </form>
     <div class="modal-controls">
-        <button id="cancelBtn" type="button">Cancel</button>
-        <button id="runAnalyzeBtn" type="submit" form="paramForm">Run Analysis</button>
+      <button id="cancelBtn" type="button">Cancel</button>
+      <button id="runAnalyzeBtn" type="submit" form="paramForm">Run Analysis</button>
     </div>
   </dialog>
 {% endblock content %}
 
 {% block extra_js %}
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-  <script src="https://unpkg.com/split.js/dist/split.min.js"></script>
-    <script>
-    const map = L.map('map', {
-      center: [51.9194, 19.1451],
-      zoom: 7,
-      minZoom: 6,
-      maxZoom: 13,
-      zoomSnap: 1,
-      zoomDelta: 1,
-      wheelPxPerZoomLevel: 120,
-      maxBoundsViscosity: 1.0
-    });
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script type="module" src="{% static 'js/main.js' %}"></script>
 
-    map.createPane('labels');
-    map.getPane('labels').style.zIndex = 650;
-    map.getPane('labels').style.pointerEvents = 'none';
 
-    // base
-    const satelliteLayer = L.tileLayer('/tiles/{z}/{x}/{y}.jpg', {
-      maxZoom: 13,
-      tms: true,
-      noWrap: true,
-      bounds: [[49, 14], [55, 25]],
-      attribution: '© Satellite'
-    }).addTo(map);
-    // overlay names
-    const labelOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png', {
-      attribution: '© CartoDB, © OpenStreetMap contributors',
-      opacity: 0.8,
-      pane: 'labels',
-    }).addTo(map);
-
-    // add overlay borders
-    async function addPolandBorders(map) {
-        try {
-            const response = await fetch('/static/poland_woj.json');
-            const polandGeoJson = await response.json();
-
-            L.geoJSON(polandGeoJson, {
-                style: function(feature) {
-                    return {
-                        color: 'yellow',
-                        weight: feature.properties.NAME_0 ? 3 : 2,
-                        opacity: 0.8,
-                        fillOpacity: 0
-                    };
-                }
-            }).addTo(map);
-
-        } catch (e) {
-            console.error("Could not load Poland GeoJSON borders. Map will function without them.", e);
-        }
-    }
-    addPolandBorders(map);
-
-    const baseLayers = { "Satellite Imagery": satelliteLayer };
-    const overlays = { "City Names": labelOverlay };
-    L.control.layers(baseLayers, overlays).addTo(map);
-
-    const paramModal = document.getElementById('paramModal');
-    const statsOutput = document.getElementById("statsOutput");
-    const preview = document.getElementById("preview");
-    const drawnItems = new L.FeatureGroup();
-    map.addLayer(drawnItems);
-
-    const drawControl = new L.Control.Draw({
-      draw: {
-        rectangle: true,
-        polygon: false, marker: false, circle: false, polyline: false
-      },
-      edit: { featureGroup: drawnItems }
-    });
-    map.addControl(drawControl);
-
-    let lastRectBounds = null;
-
-    // * bounds of rectangle
-    map.on(L.Draw.Event.CREATED, e => {
-      drawnItems.clearLayers();
-      const layer = e.layer;
-      drawnItems.addLayer(layer);
-      lastRectBounds = layer.getBounds();
-
-      paramModal.showModal();
-    });
-
-    // * clear rectangle
-    document.getElementById('cancelBtn').onclick = () => {
-        paramModal.close();
-        if (drawnItems.getLayers().length > 0) {
-            drawnItems.clearLayers();
-        }
-    };
-
-    // * run analisys
-    document.getElementById('paramForm').onsubmit = async (e) => {
-      e.preventDefault();
-      paramModal.close();
-
-      if (!lastRectBounds) return;
-
-      // * parameters in bbox
-      const params = {
-        TILE_SIZE: parseInt(document.getElementById('tile_size').value, 10),
-        IMG_SIZE: parseInt(document.getElementById('img_size').value, 10),
-        APPLY_SMOOTHING: document.getElementById('smoothing').checked
-      };
-
-      const bbox = [
-        lastRectBounds.getSouthWest().lng,
-        lastRectBounds.getSouthWest().lat,
-        lastRectBounds.getNorthEast().lng,
-        lastRectBounds.getNorthEast().lat
-      ];
-
-      const payload = {
-          bbox,
-          zoom: map.getZoom(),
-          params,
-          model_path: "Classifier/inputs/networks/mobilenetv2_2.keras"
-      };
-
-      preview.style.opacity = '0';
-      preview.style.display = 'none';
-      statsOutput.innerHTML = '<div style="text-align:center; padding: 20px;">Processing...<div style="margin-top:10px;"></div></div>';
-
-      try {
-        const resp = await fetch('/analyze-bbox/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const j = await resp.json();
-        if (j.error) {
-          statsOutput.textContent = "Error: " + j.error;
-          return;
-        }
-        // for stats output + JSON EXTACTION
-        statsOutput.textContent = JSON.stringify(j.stats, null, 2);
-
-        if (j.preview_image) {
-          preview.src = j.preview_image;
-          preview.onload = () => {
-            preview.style.display = "block";
-            setTimeout(() => { preview.style.opacity = '1'; }, 10);
-          };
-        }
-
-      } catch (err) {
-        statsOutput.textContent = "Request failed: " + err.message;
-        console.error(err);
-      }
-    };
-    </script>
 {% endblock extra_js %}

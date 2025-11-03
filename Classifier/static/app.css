@@ -1,32 +1,70 @@
 nav {
-    background: #2c3e50; /* Ciemny kolor tła */
-    color: white;
-    padding: 12px 30px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    display: flex;
-    gap: 20px;
-    align-items: center;
+  position: fixed;
+  top: 5px; /* small gap from top */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;       /* default collapsed width */
+  height: 10px;       /* very thin ellipse */
+  background: #2c3e50;
+  border-radius: 50px; /* makes it fully elliptical */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 10px;
+  transition: all 0.3s ease;
+  z-index: 1200;
+  cursor: pointer;
 }
 
+/* Tiny hint stripe inside the ellipse */
+nav::before {
+  content: '';
+  position: absolute;
+  top: 3px;      /* center vertically in thin ellipse */
+  width: 60px;
+  height: 2px;   /* very thin */
+  background: #ecf0f1;
+  border-radius: 1px;
+  opacity: 0.6;
+  transition: all 0.3s ease;
+}
+
+/* Expand nav on hover */
+nav:hover {
+  width: 300px;   /* wider */
+  height: 50px;   /* taller */
+  border-radius: 12px; /* less rounded on expansion */
+  padding: 10px;
+}
+
+/* Highlight the inner stripe on hover */
+nav:hover::before {
+  background: #3498db;
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(52,152,219,0.6);
+}
+
+/* Links */
 nav a {
-    color: #ecf0f1;
-    text-decoration: none;
-    font-weight: 600;
-    padding: 5px 10px;
-    border-radius: 4px;
-    transition: background-color 0.3s;
+  color: #ecf0f1;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: background-color 0.3s, transform 0.2s;
+  opacity: 0;
+  pointer-events: none; /* disabled when collapsed */
+}
+
+/* Show links when expanded */
+nav:hover a {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 nav a:hover {
-    background-color: #34495e;
-    color: white;
-}
-
-footer {
-    background: #34495e;
-    color: #bdc3c7;
-    text-align: center;
-    padding: 10px 0;
-    font-size: 0.85em;
-    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #34495e;
+  transform: scale(1.1);
 }

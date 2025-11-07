@@ -34,6 +34,7 @@ def classify_image(image_path, model, img_size, tile_size, class_names):
      ! only for test classification_mask (np.array): RGB mask of classified tiles
         ! only for test statistics (dict): percentage of each class across the image
     """
+    print(f"Current Working Directory: {os.getcwd()}")
     original = cv2.imread(image_path)
     if original is None:
         raise FileNotFoundError(f"Cannot read image: {image_path}")
@@ -57,7 +58,10 @@ def classify_image(image_path, model, img_size, tile_size, class_names):
 
             patch_resized = cv2.resize(patch, (img_size, img_size))
             patch_rgb = cv2.cvtColor(patch_resized, cv2.COLOR_BGR2RGB)
-            arr = img_to_array(patch_rgb) / 255.0
+            from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+            arr = img_to_array(patch_rgb)
+            arr = preprocess_input(arr)
             arr = np.expand_dims(arr, axis=0)
 
             pred = model.predict(arr, verbose=0)[0]

@@ -8,27 +8,26 @@
     {% block extra_css %}{% endblock extra_css %}
 </head>
 <body>
-    <div id="app-container">
+<div id="app-container">
 
-        <nav>
-            <a href="/">Analiza</a>
-            <a href="/city/wroclaw">Wroclaw</a>
-            <a href="/city/wroclaw">Dolnoslask</a>
-        </nav>
+    <nav>
+        <a href="/">Własna analiza</a>
+        <a href="/wojewodztwa">Analiza wybranego województwa</a>
+        <a href="/history">Analizy dokonane na stronie</a>
+    </nav>
+
+    <main class="content">
+        {% block content %}
+        {% endblock content %}
+    </main>
 
 
-        <main class="content">
-            {% block content %}
-            {% endblock content %}
-        </main>
-        
+    <footer>
+        &copy; 2025 LandCoverWebApp - aplikacja webowa do analizy obszaru Polski
+    </footer>
+</div>
 
-        <footer>
-            &copy; 2025 GeoApp — Land Classification System
-        </footer>
-    </div>
-
-    {% block extra_js %}{% endblock extra_js %}
+{% block extra_js %}{% endblock extra_js %}
 
 </body>
 </html>

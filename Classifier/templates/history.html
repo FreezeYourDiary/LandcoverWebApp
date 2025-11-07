@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}All Analyses{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'app.css' %}">
+<link rel="stylesheet" href="{% static 'history.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+<div class="analyses-container">
+  <div class="header">
+    <h1>Historia</h1>
+    <p style="color: var(--text-light);">Do tej pory na stronie dokonano {{ total_count }} badan klasyfikacji terenu (Strona {{ page_obj.number }} z {{ page_obj.paginator.num_pages }})</p>
+  </div>
+
+  <div class="analyses-grid">
+    {% for analysis in page_obj %}
+    <div class="analysis-card">
+      <div class="analysis-image">
+        {% if analysis.preview_path %}
+        <img src="{% url 'analysis_preview' analysis.type analysis.id %}"
+             alt="Analysis preview"
+             loading="lazy">
+        {% else %}
+        <span style="color: var(--text-light);">No preview available</span>
+        {% endif %}
+      </div>
+
+      <div class="analysis-content">
+        <div class="analysis-header">
+          <span class="analysis-type type-{{ analysis.type }}">
+            {% if analysis.type == 'bbox' %}BBox{% else %}Województwo{% endif %}
+          </span>
+          <span class="analysis-timestamp">
+            {{ analysis.timestamp|date:"Y-m-d H:i" }}
+          </span>
+        </div>
+
+        <h3 class="analysis-title">
+          {% if analysis.type == 'wojewodztwo' %}
+            {{ analysis.wojewodztwo_name|title }}
+          {% else %}
+            Analysis #{{ analysis.id }}
+          {% endif %}
+        </h3>
+
+        <div class="analysis-meta">
+          <span>Model: {{ analysis.model }}</span>
+          {% if analysis.total_area_km2 %}
+          <span>Area: {{ analysis.total_area_km2|floatformat:2 }} km²</span>
+          {% endif %}
+        </div>
+        {% if analysis.stats %}
+        <div class="stats-preview">
+          {% if analysis.stats.areas_pct %}
+            {% for class_name, percentage in analysis.stats.areas_pct.items %}
+              {% if percentage > 5 %}
+              <div class="stat-item">
+                <span class="stat-label">{{ class_name }}</span>
+                <span class="stat-value">{{ percentage|floatformat:1 }}%</span>
+              </div>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <div class="stat-item">
+              <span class="stat-label">No stats available</span>
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="analysis-actions">
+{#          {% if analysis.type == 'wojewodztwo' %}#}
+{#          <a href="{% url 'wojewodztwo_detail' analysis.id %}" class="btn btn-primary btn-small">#}
+{#            📊 View Details#}
+{#          </a>#}
+{#          {% endif %}#}
+          {% if analysis.files.stats_json %}
+          <a href="{% url 'download_analysis_file' analysis.type analysis.id 'stats_json' %}"
+             class="btn btn-secondary btn-small" download>
+            Pobierz Statystyki
+          </a>
+          {% endif %}
+
+          {% if analysis.files.fig %}
+          <a href="{% url 'download_analysis_file' analysis.type analysis.id 'fig' %}"
+             class="btn btn-secondary btn-small" download>
+            Pobierz obrazek
+          </a>
+          {% endif %}
+
+          {% if analysis.files.mask %}
+          <a href="{% url 'download_analysis_file' analysis.type analysis.id 'mask' %}"
+             class="btn btn-secondary btn-small" download>
+            Pobierz maskę
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
+      <h3 style="color: var(--text-light);">Brakuje analizy</h3>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?page=1">« First</a>
+    <a href="?page={{ page_obj.previous_page_number }}">‹ Poprzednia</a>
+    {% else %}
+    <span class="disabled">« Pierwsza</span>
+    <span class="disabled">‹ Poprzednia</span>
+    {% endif %}
+
+    <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">Dalej ›</a>
+    <a href="?page={{ page_obj.paginator.num_pages }}">Ostatnia »</a>
+    {% else %}
+    <span class="disabled">Dalej ›</span>
+    <span class="disabled">Ostatnia »</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock content %}

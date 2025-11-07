@@ -27,7 +27,7 @@ export async function runAnalysis(rectBounds, zoom) {
     zoom: zoom,
     params,
 
-    model_path: "Classifier/inputs/networks/mobilenetv2_2.keras"
+    model_path: "Classifier/inputs/networks/mobilenetv2_v3.keras"
   };
 
   paramModal.close();

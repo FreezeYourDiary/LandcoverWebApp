@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Województwa Analysis{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'app.css' %}">
+<link rel="stylesheet" href="{% static 'list.css' %}">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css">
+
+{% endblock extra_css %}
+
+{% block content %}
+<div class="wojewodztwa-container">
+  <div class="header">
+    <h1>Analiza Województwa</h1>
+    <p>Wybierz województwo do przeglądu statystyk lub analizy</p>
+  </div>
+
+  <div class="main-grid">
+    <div class="sidebar">
+      <h2>Województwa ({{ wojewodztwa|length }})</h2>
+      <div id="wojewodztwaList">
+        {% for woj in wojewodztwa %}
+        <div class="wojewodztwo-item {% if woj.analyzed %}analyzed{% endif %}"
+             data-id="{{ woj.id }}"
+             data-nazwa="{{ woj.nazwa }}"
+             data-bounds="{{ woj.bounds|safe }}">
+          <div class="wojewodztwo-name">{{ woj.nazwa|title }}</div>
+          <div class="wojewodztwo-status">
+            {% if woj.analyzed %}
+              <span class="analyze-badge">+ Przeanalizowano</span>
+              {% if woj.last_analysis %}
+                <small>Last: {{ woj.last_analysis|date:"Y-m-d" }}</small>
+              {% endif %}
+            {% else %}
+              <small>Jeszcze nie przeanalizowano</small>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="map-container">
+      <h2>Mapa</h2>
+      <div id="map"></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="configModal">
+  <div class="modal-header">
+    <h3 id="modalTitle">Skonfiguruj analizę</h3>
+  </div>
+
+  <div class="config-group">
+    <label for="modelSelect">Wybierz model:</label>
+{#      tu moze byc tooltip wskazujacy bazowe rzeczy odnosnie kazdej z modeli#}
+    <select id="modelSelect">
+      <option value="Classifier/inputs/networks/mobilenetv2_v3.keras">MobileNetV2 v3 (Recommended)</option>
+      <option value="Classifier/inputs/networks/mobilenetv2_2.keras">MobileNetV2 v2</option>
+      <option value="Classifier/inputs/networks/dummy_future.keras">Dummy Model (Testing)</option>
+    </select>
+  </div>
+
+  <div class="config-group">
+    <label for="tileSize">Rozmiar kafelka do podziału:</label>
+    <select id="tileSize">
+      <option value="32">32px - Dokładny (wolniejszy)</option>
+      <option value="64" selected>64px - Zbalansowany</option>
+      <option value="128">128px - Szybki (szybki)</option>
+    </select>
+  </div>
+
+  <div class="config-group">
+    <label for="zoomLevel">Poziom mapowy:</label>
+    <select id="zoomLevel">
+      <option value="8">8 - Szybki</option>
+      <option value="10">10 - Średni (zalecany)</option>
+      <option value="12">12 - Wysoki</option>
+      <option value="13" selected>13 - Maksymalny (bardzo wolny)</option>
+    </select>
+  </div>
+
+  <div class="config-group">
+    <label class="checkbox-label">
+      <input type="checkbox" id="applySmoothing" checked>
+      <span>Wykonaj wygładzenie sąsiadowe</span>
+    </label>
+    <p class="config-help">Pomaga w usuwaniu artefaktów nie wiązanych kontekstem</p>
+  </div>
+
+  <div class="modal-controls">
+    <button id="cancelBtn" class="btn-secondary">Anuluj</button>
+    <button id="runAnalyzeBtn" class="btn-primary">Analizuj</button>
+  </div>
+</dialog>
+<div class="loading-overlay" id="loadingOverlay" style="display: none;">
+  <div class="loading-content">
+    <div class="spinner"></div>
+    <h3>Processing...</h3>
+{#      todo dodac progress #}
+    <p>W zależności od konfiguracji będzie trwało chwilę</p>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script type="module" src="{% static 'js/list.js' %}"></script>
+{% endblock extra_js %}

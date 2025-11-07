@@ -1,5 +1,5 @@
 DEFAULT_CONFIG = {
-    "MODEL_PATH": "Classifier/inputs/networks/mobilenetv2_2.keras",
+    "MODEL_PATH": "Classifier/inputs/networks/mobilenetv2_v3.keras",
     "IMG_SIZE": 64,
     "TILE_SIZE": 32,
     "CONF_THRESH": 0.6,

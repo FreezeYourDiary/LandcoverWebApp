@@ -1,29 +1,82 @@
+# Classifier/src/stats.py - FIXED area calculation
+
 import numpy as np
 import cv2
 from scipy import ndimage as ndi
 from Classifier.src.config import COLORS
+import math
 
-def compute_class_areas(classification_mask, class_names, pixel_size_m=10):
-    """Returns area per class in km²."""
+def meters_per_pixel_at_zoom(lat, zoom):
+    """
+    Args:
+        lat: degrees
+        zoom: Zoom level adjustments ** math
+    """
+    EARTH_CIRCUMFERENCE = 40075017
+    meters_per_pixel_equator = EARTH_CIRCUMFERENCE / 256
+    meters_per_pixel = meters_per_pixel_equator / (2 ** zoom)
+    meters_per_pixel *= math.cos(math.radians(lat))
+
+    return meters_per_pixel
+
+
+def compute_class_areas(classification_mask, class_names, valid_mask=None, zoom=None, bounds=None):
+    """
+    Args:
+        classification_mask, class_names: List of class names
+        valid_mask: (255=valid, 0=masked) poza maska usuwa
+        zoom, bounds: [minx, miny, maxx, maxy] bounding box
+
+    Returns:
+        Dict of {class_name: area_km2}
+    """
     h, w, _ = classification_mask.shape
-    pixel_area_km2 = (pixel_size_m ** 2) / 1e6
+
+    if zoom is not None and bounds is not None:
+        # center of lat
+        center_lat = (bounds[1] + bounds[3]) / 2
+        meters_per_pixel = meters_per_pixel_at_zoom(center_lat, zoom)
+        pixel_area_m2 = meters_per_pixel ** 2
+        pixel_area_km2 = pixel_area_m2 / 1_000_000
+    else:
+        # 10m/pixel
+        pixel_area_km2 = (10 ** 2) / 1_000_000
+        print("[WARN] No zoom/bounds provided, using rough estimate for pixel size")
+
     areas = {}
     for i, cls in enumerate(class_names):
         color = np.array(list(COLORS[cls]))
         mask = np.all(classification_mask == color, axis=-1)
+        if valid_mask is not None:
+            mask = mask & (valid_mask > 0)
+
         n_pixels = np.sum(mask)
         areas[cls] = n_pixels * pixel_area_km2
+
     return areas
 
 
-def compute_class_areas_percentage(classification_mask, class_names):
+def compute_class_areas_percentage(classification_mask, class_names, valid_mask=None):
     """Returns area per class in % of whole image."""
-    total_pixels = classification_mask.shape[0] * classification_mask.shape[1]
+
+    if valid_mask is not None:
+        total_valid_pixels = np.sum(valid_mask > 0)
+    else:
+        total_valid_pixels = classification_mask.shape[0] * classification_mask.shape[1]
+
+    if total_valid_pixels == 0:
+        return {cls: 0.0 for cls in class_names}
+
     perc = {}
     for cls in class_names:
         color = np.array(list(COLORS[cls]))
-        mask = np.all(classification_mask == color, axis=-1)
-        perc[cls] = (np.sum(mask) / total_pixels) * 100
+        class_pixels = np.all(classification_mask == color, axis=-1)
+
+        if valid_mask is not None:
+            class_pixels = class_pixels & (valid_mask > 0)
+
+        perc[cls] = (np.sum(class_pixels) / total_valid_pixels) * 100
+
     return perc
 
 
@@ -64,8 +117,6 @@ def compute_boundary_analysis(classification_mask, class_names):
         for x in range(w):
             color = tuple(classification_mask[y, x])
             mask_idx[y, x] = color_to_idx.get(color, -1)
-
-    # 4-neighborhood adjacency
     for y in range(h - 1):
         for x in range(w - 1):
             c1, c2 = mask_idx[y, x], mask_idx[y, x + 1]
@@ -85,8 +136,10 @@ def compute_boundary_analysis(classification_mask, class_names):
 
     return adjacency
 
+
 def normalize_stats(stats: dict):
-    """round for json"""
+    """Round for json"""
+
     def round_values(d):
         return {k: round(v, 4) if isinstance(v, (int, float)) else v for k, v in d.items()}
 

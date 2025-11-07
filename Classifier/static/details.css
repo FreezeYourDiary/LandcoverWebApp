@@ -1,0 +1,20 @@
+.image-control-btn {
+padding: 0.4rem 0.8rem;
+border: 1px solid var(--border-color);
+background: var(--bg-light);
+border-radius: 4px;
+cursor: pointer;
+font-weight: 600;
+font-size: 0.875rem;
+transition: all 0.2s;
+}
+
+.image-control-btn:hover {
+border-color: var(--accent-default);
+}
+
+.image-control-btn.active {
+background: var(--accent-default);
+color: white;
+border-color: var(--accent-default);
+}

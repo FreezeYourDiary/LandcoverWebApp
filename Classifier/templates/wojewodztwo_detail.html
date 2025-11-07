@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %} Analiza - {{ wojewodztwo.display_name }} województwo {% endblock %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'app.css' %}">
+    <link rel="stylesheet" href="{% static 'map.css' %}">
+    <link rel="stylesheet" href="{% static 'details.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css">
+{% endblock extra_css %}
+
+{% block content %}
+    <div id="main-container">
+        <!-- stats 75% -->
+        <div id="results-pane" style="width: var(--results-width);">
+            <a href="{% url 'wojewodztwa_list' %}" class="btn-secondary"
+               style="display: inline-block; margin-bottom: 1rem;"> <------- </a>
+
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <h1>{{ wojewodztwo.display_name }}</h1>
+                <p style="color: var(--text-light);"> Niżej przedstawiono analizę dla wybranego województwa. Statystyki
+                    obejmują wlasne wzory Procentowego udziału,
+                    Obliczenie całkowitej powierzchni dla każdej klasy terenu w km2 & Gęstość występowania & Analiza
+                    granic - Opis proporcji granic między różnymi typami terenu. </p>
+            </div>
+
+            {% if has_analysis %}
+                <!-- Stats cards -->
+                {% if wojewodztwo_stats %}
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                        {% for key, value in wojewodztwo_stats.items %}
+                            <div class="card">
+                                <h3 style="font-size: 0.875rem; color: var(--text-light); margin-bottom: 0.5rem; text-transform: uppercase;">{{ key }}</h3>
+                                <p style="font-size: 1.5rem; font-weight: 700; margin: 0;">{{ value }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="margin: 0;">Statistics</h3>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="viewRawBtn" title="View Raw JSON" style="padding: 0.5rem; font-size: 1.2rem;">
+                                📄
+                            </button>
+                            <button id="downloadBtn" title="Download JSON" style="padding: 0.5rem; font-size: 1.2rem;">
+                                💾
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="tabsHeader"></div>
+                    <div style="max-height: 600px; overflow-y: auto;">
+                        <canvas id="statsChart"></canvas>
+                        <div id="statsTable"></div>
+                    </div>
+                </div>
+
+            {% else %}
+                <div class="card">
+                    <div style="text-align: center; padding: 3rem;">
+                        <h2 style="color: var(--text-light);">Brakuje analizy</h2>
+                        <p style="color: var(--text-light); margin-bottom: 1.5rem;">
+                            Odpal analizę by zobaczyć statystyki
+                        </p>
+                        <button class="btn-primary" onclick="window.location.href='{% url 'wojewodztwa_list' %}'">
+                            Wróć [strona analizy]
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="splitter"></div>
+        <div id="map-pane" style="width: var(--map-width); padding: 20px; overflow-y: auto; background: white;">
+            {% if has_analysis %}
+                <div class="card" style="height: 100%;">
+                    <h3 style="margin-bottom: 0.75rem;">Visualization</h3>
+
+                    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        <button class="image-control-btn active" data-view="original">Original</button>
+                        <button class="image-control-btn" data-view="mask">Mask</button>
+                        <button class="image-control-btn" data-view="blended">Overlay</button>
+                    </div>
+
+                    <div style="position: relative; width: 100%; background: var(--bg-light); border-radius: 4px; overflow: hidden;">
+                        <div style="padding-top: 100%;"></div>
+                        <div class="image-layer active" data-layer="original"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 1; transition: opacity 0.3s;">
+                            {% if original_image %}
+                                <img src="{{ original_image }}" alt="Original"
+                                     style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% endif %}
+                        </div>
+                        <div class="image-layer" data-layer="mask"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;">
+                            {% if mask_image %}
+                                <img src="{{ mask_image }}" alt="Classification"
+                                     style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% endif %}
+                        </div>
+                        <div class="image-layer" data-layer="blended"
+                             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s;">
+                            {% if blended_image %}
+                                <img src="{{ blended_image }}" alt="Overlay"
+                                     style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        window.AppConfig = {
+            hasAnalysis: {% if has_analysis %}true{% else %}false{% endif %},
+
+            {% if has_analysis %}
+                stats: JSON.parse('{{ stats_json|escapejs }}'),
+                tabs: JSON.parse('{{ tabs_json|escapejs }}'),
+                polandAverages: {{ poland_averages|safe }},
+                wojewodztwoName: '{{ wojewodztwo.name|escapejs }}',
+            {% endif %}
+
+            colors: [
+                "#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336",
+                "#00bcd4", "#8bc34a", "#ffeb3b", "#795548", "#607d8b"
+            ]
+        };
+    </script>
+    <script src="{% static 'js/details.js' %}"></script>
+{% endblock extra_js %}

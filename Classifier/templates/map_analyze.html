@@ -6,65 +6,82 @@
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<link rel="stylesheet" href="{% static 'app.css' %}">
 <link rel="stylesheet" href="{% static 'map.css' %}">
-
 {% endblock extra_css %}
 
 {% block content %}
-  <div id="main-container">
-    <div id="map-pane" class="map-pane">
-      <div id="map"></div>
-    </div>
-    <div id="splitter"></div>
-    <div id="results-pane" class="results-pane">
-      <h2>Analiza statystyczna wybranego obszaru</h2>
+<div id="main-container">
+  <div id="map-pane">
+    <div id="map"></div>
+  </div>
 
-      <div id="progressPanel">
-          <h3 style="margin:0;">Progress</h3>
-        <div class="progress-step pending">wyodrębnianie kafelków mapy</div>
-        <div class="progress-step pending">przycinanie obszaru</div>
-        <div class="progress-step pending">analiza obszaru</div>
-        <div class="progress-step pending">zapis statystyk</div>
+  <div id="splitter"></div>
+
+  <div id="results-pane">
+    <h2 style="margin-top: 0;">Analiza statystyczna wybranego obszaru</h2>
+
+    <div class="card" id="progressPanel">
+      <h3 style="margin: 0 0 1rem 0;">Progress</h3>
+      <div class="progress-step pending">wyodrębnianie kafelków mapy</div>
+      <div class="progress-step pending">przycinanie obszaru</div>
+      <div class="progress-step pending">analiza obszaru</div>
+      <div class="progress-step pending">zapis statystyk</div>
+    </div>
+
+    <div class="card" id="statsContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0;">Statystyki</h3>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="viewRawJsonBtn" class="btn-secondary" title="View Raw JSON" style="padding: 0.5rem; font-size: 1.2rem;">📄</button>
+          <button id="downloadJsonBtn" class="btn-secondary" title="Download JSON" style="padding: 0.5rem; font-size: 1.2rem;">💾</button>
+        </div>
       </div>
 
-      <div id="statsContainer">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h3 style="margin:0;">Statystyki</h3>
-    <button id="viewRawJsonBtn" style="margin-right: 1px;">
-        Raw
-    </button>
-    <button id="downloadJsonBtn">
-        Download JSON [⬇]
-    </button>
-  </div>
+      <div id="tabsHeader"></div>
+      <div id="statsBars">Analiza rozpocznie się po wybraniu strefy, którą chcesz przeanalizować na mapie.</div>
+    </div>
 
-  <div id="tabsHeader"></div>
-  <div id="statsBars">Analiza rozpocznie się po wybraniu strefy, którą chcesz przeanalizować na mapie.</div>
+    <div class="card">
+      <h3 style="margin: 0 0 1rem 0;">Preview</h3>
+      <img id="preview" alt="Result preview" style="display: none; max-width: 100%; border-radius: 4px; border: 1px solid var(--border-light);"/>
+    </div>
+  </div>
 </div>
 
-      <h3>Preview</h3>
-      <img id="preview" alt="Result preview" style="display: none; max-width:100%; border-radius:8px;"/>
-    </div>
+<dialog id="paramModal">
+  <div class="modal-header">
+    <h3 style="margin: 0;">Analysis Parameters</h3>
   </div>
 
-  <dialog id="paramModal">
-    <h3>Analysis Parameters</h3>
-    <form id="paramForm">
-      <p><label>Tile size (px): <input id="tile_size" type="number" value="32"/></label></p>
-      <p><label>Image size (px): <input id="img_size" type="number" value="64"/></label></p>
-      <p><label>Apply smoothing: <input id="smoothing" type="checkbox" checked/></label></p>
-    </form>
-    <div class="modal-controls">
-      <button id="cancelBtn" type="button">Cancel</button>
-      <button id="runAnalyzeBtn" type="submit" form="paramForm">Run Analysis</button>
+  <form id="paramForm">
+    <div class="config-group">
+      <label for="tile_size">Tile size (px):</label>
+      <input id="tile_size" type="number" value="32"/>
     </div>
-  </dialog>
+
+    <div class="config-group">
+      <label for="img_size">Image size (px):</label>
+      <input id="img_size" type="number" value="64"/>
+    </div>
+
+    <div class="config-group">
+      <label class="checkbox-label">
+        <input id="smoothing" type="checkbox" checked/>
+        <span> Smoothing </span>
+      </label>
+    </div>
+  </form>
+
+  <div class="modal-controls">
+    <button id="cancelBtn" class="btn-secondary" type="button">Cancel</button>
+    <button id="runAnalyzeBtn" class="btn-primary" type="submit" form="paramForm">Run Analysis</button>
+  </div>
+</dialog>
 {% endblock content %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script type="module" src="{% static 'js/main.js' %}"></script>
-
-
 {% endblock extra_js %}

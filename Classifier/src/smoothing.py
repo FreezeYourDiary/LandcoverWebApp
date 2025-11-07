@@ -5,14 +5,21 @@ from Classifier.src.config import CLASS_NAMES, CLASS_PRIORITY
 
 
 def smooth_predictions(pred_grid, conf_grid, global_prob, confidence_thresh, neighborhood,
-                       class_priority=CLASS_PRIORITY):
+                       class_priority=CLASS_PRIORITY, valid_mask=None):
     smoothed = pred_grid.copy()
     h, w = pred_grid.shape
     r = neighborhood // 2
     change_log = []
 
+    # +valid mask if need
+    if valid_mask is None:
+        valid_mask = pred_grid != -1
+
     for y in range(h):
         for x in range(w):
+            if not valid_mask[y, x] or pred_grid[y, x] == -1:
+                continue
+
             cls = pred_grid[y, x]
             conf = conf_grid[y, x]
             if conf >= confidence_thresh:
@@ -21,12 +28,15 @@ def smooth_predictions(pred_grid, conf_grid, global_prob, confidence_thresh, nei
             y1, y2 = max(0, y - r), min(h, y + r + 1)
             x1, x2 = max(0, x - r), min(w, x + r + 1)
             window = pred_grid[y1:y2, x1:x2].flatten()
-
-            # debug check for empty window (>? r >= 0)
             if window.size == 0:
                 continue
+            valid_window = window[window >= 0]  # only non-negative class indices
 
-            majority_class = np.bincount(window).argmax()
+            # +1 valid sasiad minimum
+            if valid_window.size == 0:
+                continue
+
+            majority_class = np.bincount(valid_window).argmax()
 
             cls_name = CLASS_NAMES[cls]
             neigh_name = CLASS_NAMES[majority_class]
@@ -39,9 +49,6 @@ def smooth_predictions(pred_grid, conf_grid, global_prob, confidence_thresh, nei
                     "tile": (y, x),
                     "from": cls_name,
                     "to": neigh_name,
-                    # "confidence": conf,
-                    # "local_score": local_score,
-                    # "neigh_score": neigh_score,
                     "confidence": float(conf),
                     "local_score": float(local_score),
                     "neigh_score": float(neigh_score)

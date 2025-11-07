@@ -6,3 +6,4 @@ outputs/
 .idea/
 /data/
 db.sqlite3
+/Classifier/inputs/

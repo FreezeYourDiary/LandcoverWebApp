@@ -6,14 +6,20 @@ import { setProgress, displayResults } from './ui.js';
  * @returns {Promise<boolean>} - return success
  */
 export async function runAnalysis(rectBounds, zoom) {
-  const paramForm = document.getElementById('paramForm');
-  const paramModal = document.getElementById('paramModal'); // DOMLOADER for access
+  console.log('[DEBUG] Frontend start');
+  console.log('[DEBUG] bbox:', rectBounds);
+  console.log('[DEBUG] zoom:', zoom);
 
-  const params = {
-    TILE_SIZE: parseInt(paramForm.elements['tile_size'].value, 10),
-    IMG_SIZE: parseInt(paramForm.elements['img_size'].value, 10),
-    APPLY_SMOOTHING: paramForm.elements['smoothing'].checked
-  };
+  const paramForm = document.getElementById('paramForm');
+  const paramModal = document.getElementById('paramModal');
+
+  // + unified params
+  const modelPath = document.getElementById('modelSelect')?.value;
+  const analysisMode = document.getElementById('analysisMode')?.value;
+  const applySmoothing = document.getElementById('smoothing')?.checked;
+  const fixSeaLake = document.getElementById('fixSeaLake')?.checked;
+
+  console.log('[DEBUG] Params:', { modelPath, analysisMode, applySmoothing, fixSeaLake });
 
   const bbox = [
     rectBounds.getSouthWest().lng,
@@ -21,26 +27,28 @@ export async function runAnalysis(rectBounds, zoom) {
     rectBounds.getNorthEast().lng,
     rectBounds.getNorthEast().lat
   ];
-/** TODO fix config for model_path*/
+
+  console.log('[DEBUG] BBox:', bbox);
+
   const payload = {
     bbox,
     zoom: zoom,
-    params,
-
-    model_path: "Classifier/inputs/networks/mobilenetv2_v3.keras"
+    model_path: modelPath,
+    params: {
+      ANALYSIS_MODE: analysisMode,
+      APPLY_SMOOTHING: applySmoothing,
+      FIX_SEALAKE: fixSeaLake
+    }
   };
 
+  console.log('[DEBUG] Payload:', JSON.stringify(payload, null, 2));
+
   paramModal.close();
-  // in UI.js
   setProgress(0);
 
   try {
-      // TODO actuall progress
     setProgress(1);
-    await new Promise(r => setTimeout(r, 500));
-    setProgress(2);
-    await new Promise(r => setTimeout(r, 500));
-    setProgress(3);
+    console.log('[DEBUG] to api /analyze-bbox/');
 
     const resp = await fetch('/analyze-bbox/', {
       method: 'POST',
@@ -48,19 +56,32 @@ export async function runAnalysis(rectBounds, zoom) {
       body: JSON.stringify(payload)
     });
 
+    console.log('[DEBUG] respstatus:', resp.status);
+
+    if (!resp.ok) {
+      throw new Error(`HTTP error! status: ${resp.status}`);
+    }
+
     const j = await resp.json();
+    console.log('[DEBUG] response: ', j);
+
     if (j.error) {
+      console.error('[ERROR] Server error:', j.error);
       document.getElementById('statsBars').textContent = "Error: " + j.error;
       setProgress(0);
       return false;
     }
 
+    setProgress(3);
+    console.log('[DEBUG] Displaying results...');
     displayResults(j);
+    console.log('[DEBUG] analysis done');
     return true;
 
   } catch (err) {
+    console.error('Analysis err:', err);
+    console.error('Stack err:', err.stack);
     document.getElementById('statsBars').textContent = "Request failed: " + err.message;
-    console.error(err);
     setProgress(0);
     return false;
   }

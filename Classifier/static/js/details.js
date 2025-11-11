@@ -1,11 +1,11 @@
 document.addEventListener("DOMContentLoaded", function() {
     const config = window.AppConfig || {};
-    const colors = config.colors || [
-      "#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336",
-      "#00bcd4", "#8bc34a", "#ffeb3b", "#795548", "#607d8b"
-    ];
+    const classColors = config.classColors || {};
 
-    // splitter init
+    const getChartColors = (classes) => {
+        return classes.map(cls => classColors[cls] || "rgb(128, 128, 128)");
+    };
+
     const splitter = document.getElementById('splitter');
     const root = document.documentElement;
     const MIN_PERCENT = 25;
@@ -56,11 +56,41 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
+    if (config.analysesCount > 1) {
+        const analysisSelect = document.getElementById('analysisSelect');
+        const analysisInfo = document.getElementById('analysisInfo');
+
+        if (analysisSelect && config.analysesList) {
+            config.analysesList.forEach(analysis => {
+                const option = document.createElement('option');
+                option.value = analysis.id;
+                option.textContent = `${analysis.created_at} - ${analysis.mode} (zoom ${analysis.zoom})`;
+                option.selected = analysis.is_current;
+                analysisSelect.appendChild(option);
+            });
+
+            const updateAnalysisInfo = () => {
+                const selectedId = parseInt(analysisSelect.value);
+                const analysis = config.analysesList.find(a => a.id === selectedId);
+                if (analysis) {
+                    analysisInfo.innerHTML = `
+                        <strong>Mode:</strong> ${analysis.mode} | 
+                        <strong>Zoom:</strong> ${analysis.zoom} | 
+                        <strong>Smoothing:</strong> ${analysis.smoothing ? 'Yes' : 'No'} | 
+                        <strong>Model:</strong> ${analysis.model}
+                    `;
+                }
+            };
+            updateAnalysisInfo();
+            analysisSelect.addEventListener('change', updateAnalysisInfo);
+        }
+    }
+
     if (config.hasAnalysis) {
         const stats = config.stats;
         const tabs = config.tabs;
         const polandAverages = config.polandAverages;
-        const wojewodztwoName = config.wojewodztwoName; // vpases todo tracing by name
+        const wojewodztwoName = config.wojewodztwoName;
 
         let currentTab = 'percentage';
         let currentChart = null;
@@ -123,15 +153,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     <div style="font-size: 2rem; font-weight: 600; color: var(--text-light);">
                         ${polandValue.toFixed(4)}
                     </div>
-                    <div style="color: var(--text-light);"> Srednia dla Polski </div>
+                    <div style="color: var(--text-light);"> Średnia dla Polski </div>
                     ` : ''}
                     </div>
                 `;
                 return;
             }
+
             if (currentTab === 'adjacency') {
                 canvas.style.display = 'none';
                 renderAdjacencyMatrix(tab.data, tableDiv);
+                return;
+            }
+
+            if (currentTab === 'fragmentation') {
+                canvas.style.display = 'none';
+                renderFragmentation(tab.data, tableDiv);
                 return;
             }
 
@@ -139,16 +176,104 @@ document.addEventListener("DOMContentLoaded", function() {
             const wojData = tab.data;
 
             if (currentTab === 'percentage') {
-                const classes = Object.keys(wojData);
-                const wojValues = classes.map(c => wojData[c] || 0);
+            const classes = Object.keys(wojData);
+            const wojValues = classes.map(c => wojData[c] || 0);
+            const colors = getChartColors(classes);
 
+            if (polandAverages && polandAverages.areas_pct) {
+                const polandValues = classes.map(c => polandAverages.areas_pct[c] || 0);
+
+                tableDiv.innerHTML = `
+                    <div style="margin-top: 2rem;">
+                        <h4 style="text-align: center; margin-bottom: 1rem;">Rozkład powierzchni</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <canvas id="wojPieChart"></canvas>
+                                <p style="text-align: center; margin-top: 0.5rem; font-weight: 600;">${wojewodztwoName}</p>
+                            </div>
+                            <div>
+                                <canvas id="polandPieChart"></canvas>
+                                <p style="text-align: center; margin-top: 0.5rem; font-weight: 600;">Polska (średnia)</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const wojPieCtx = document.getElementById('wojPieChart').getContext('2d');
+                new Chart(wojPieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: classes,
+                        datasets: [{
+                            data: wojValues,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed.toFixed(2);
+                                        return `${label}: ${value}%`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const polandPieCtx = document.getElementById('polandPieChart').getContext('2d');
+                new Chart(polandPieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: classes,
+                        datasets: [{
+                            data: polandValues,
+                            backgroundColor: colors.map(c => c.replace('rgb', 'rgba').replace(')', ', 0.6)')),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'right',
+                                labels: {
+                                    boxWidth: 12,
+                                    font: { size: 10 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed.toFixed(2);
+                                        return `${label}: ${value}%`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+            } else {
                 currentChart = new Chart(canvas, {
                     type: 'pie',
                     data: {
                         labels: classes,
                         datasets: [{
                             data: wojValues,
-                            backgroundColor: colors.slice(0, classes.length),
+                            backgroundColor: colors,
                             borderWidth: 2,
                             borderColor: '#fff'
                         }]
@@ -166,6 +291,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 });
             }
+        }
+    else if (currentTab === 'area') {
+        canvas.style.display = 'none';
+        renderAreaBars(wojData, tableDiv);
+    }
             else if (currentTab === 'area') {
                 canvas.style.display = 'none';
                 renderAreaBars(wojData, tableDiv);
@@ -187,7 +317,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 subset.forEach(([cls, area], i) => {
                     const pct = (area / maxValue) * 100;
-                    const color = colors[i % colors.length];
+                    const color = classColors[cls] || "rgb(128, 128, 128)";
 
                     const item = document.createElement('div');
                     item.style.marginBottom = '0.75rem';
@@ -216,29 +346,76 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         function renderAdjacencyMatrix(data, container) {
-            if (!data || typeof data !== 'object') {
+            if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
                 container.innerHTML = '<p style="text-align:center;color:var(--text-light);">No adjacency data</p>';
                 return;
             }
 
             const classes = Object.keys(data);
-            let html = '<table class="simple-table"><tr><th></th>';
-
-            classes.forEach(c => html += `<th>${c}</th>`);
+            let html = '<div style="overflow-x: auto;"><table class="simple-table" style="border-collapse: collapse;"><tr><th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light);"></th>';
+            html += '<div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-light); border-radius: 4px; font-size: 0.875rem;">';
+            html += '<strong>Wskaźnik macierzy sąsiedztwa:</strong> Generalnie wskazuje jakie klasy sasiedstwuja ze soba, przyda sie w analizie obszarow';
+            html += 'Wyższa wartość = bardziej pofragmentowany teren.';
+            html += '</div>';
+            classes.forEach(c => {
+                html += `<th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light); font-size: 0.75rem;">${c}</th>`;
+            });
             html += '</tr>';
 
             classes.forEach(class1 => {
-                html += `<tr><th>${class1}</th>`;
+                html += `<tr><th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light); text-align: left; font-size: 0.75rem;">${class1}</th>`;
                 classes.forEach(class2 => {
                     const value = data[class1]?.[class2] || 0;
+                    const percentage = (value * 100).toFixed(2);
                     const intensity = Math.min(value / 0.2, 1);
-                    const bgColor = `rgba(52, 152, 219, ${intensity * 0.7})`;
-                    html += `<td style="background: ${bgColor}; padding: 8px;">${value.toFixed(4)}</td>`;
+                    const bgColor = class1 === class2 ? 'var(--bg-light)' : `rgba(255, 12, 80, ${intensity * 0.7})`;
+                    const textColor = intensity > 0.5 && class1 !== class2 ? 'white' : 'var(--text-default)';
+                    html += `<td style="background: ${bgColor}; padding: 8px; border: 1px solid var(--border-color); color: ${textColor}; text-align: center; font-size: 0.75rem;">${class1 === class2 ? '-' : percentage}</td>`;
                 });
                 html += '</tr>';
             });
 
-            html += '</table>';
+            html += '</table></div>';
+            container.innerHTML = html;
+        }
+
+        function renderFragmentation(data, container) {
+            if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-light);">No fragmentation</p>';
+                return;
+            }
+
+            const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+            const maxValue = sorted[0][1];
+
+            let html = '<div style="padding: 1rem;">';
+            html += '<div style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-light); border-radius: 4px; font-size: 0.875rem;">';
+            html += '<strong>Wskaźnik fragmentacji:</strong> Liczba oddzielnych łat danej klasy podzielona przez jej całkowitą powierzchnię. ';
+            html += 'Wyższa wartość = bardziej pofragmentowany teren.';
+            html += '</div>';
+
+            sorted.forEach(([cls, value]) => {
+                const color = classColors[cls] || "rgb(128, 128, 128)";
+                const pct = (value / maxValue) * 100 * 100;
+                const displayValue = (value < 0.001 ? value.toExponential(3) : value.toFixed(6));
+
+                html += `
+                    <div style="margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="width: 16px; height: 16px; background: ${color}; border: 1px solid var(--border-color); border-radius: 2px;"></div>
+                                <span style="font-size: 0.875rem; font-weight: 500;">${cls}</span>
+                            </div>
+                            <span style="font-size: 0.875rem; font-weight: 600;">${displayValue}</span>
+                        </div>
+                        <div style="width: 100%; height: 24px; background: var(--bg-light); border-radius: 4px; overflow: hidden;">
+                            <div style="height: 100%; background: ${color}; width: ${pct}%; transition: width 0.5s ease;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
             container.innerHTML = html;
         }
 

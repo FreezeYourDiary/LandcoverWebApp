@@ -40,13 +40,15 @@ def analyze_bbox(request):
         bbox = payload.get("bbox")
         params = payload.get("params", {})
         model_path = payload.get("model_path")
-        mode = payload.get("mode", "cropped")  # "cropped" or "full"
+        mode = payload.get("mode", "cropped")
         zoom = payload.get("zoom") or params.get("ZOOM", 8)
 
         if not bbox or not model_path:
             return JsonResponse({"error": "Missing bbox or model_path"}, status=400)
+        # unified cache fix
+        cache_key = make_bbox_cache_key(bbox, model_path, params, zoom)
+        # cache_key = make_cache_key(bbox, model_path, params)
 
-        cache_key = make_cache_key(bbox, model_path, params)
         mbtiles_path = os.path.join(settings.BASE_DIR, "data/raw/satellite-2017-11-02_europe_poland.mbtiles")
         if not os.path.exists(mbtiles_path):
             return JsonResponse({"error": f"Missing MBTiles at {mbtiles_path}"}, status=500)
@@ -67,26 +69,21 @@ def analyze_bbox(request):
         if mode == "cropped":
             cropped_path = crop_to_bbox(stitched_path, bbox, zoom)
         else:
-            cropped_path = stitched_path  # full image mode
+            cropped_path = stitched_path
 
-        full_img = cv2.imread(stitched_path)
-        overlay = full_img.copy()
-        h, w, _ = full_img.shape
-
-        color = (0, 255, 0)
-        thickness = 3
-        cv2.rectangle(overlay, (10, 10), (w - 10, h - 10), color, thickness)
-        alpha = 0.4
-        preview_img = cv2.addWeighted(overlay, alpha, full_img, 1 - alpha, 0)
-
-        preview_overlay_path = os.path.join(
-            settings.MEDIA_ROOT, f"Classifier/outputs/stitched/area_{timestamp}_overlay.jpg"
+        stats, outputs = run_analysis(
+            image_path=cropped_path,
+            model_path=model_path,
+            options={
+                **params,
+                'zoom': zoom,
+                'bounds': bbox
+            }
         )
-        cv2.imwrite(preview_overlay_path, preview_img)
-
-        stats, outputs = run_analysis(image_path=cropped_path, model_path=model_path, options=params)
 
         mask_path = outputs.get("mask_path") or outputs.get("mask")
+        blended_path = outputs.get("blended_path") or outputs.get("blended")
+
         if isinstance(mask_path, list):
             mask_path = mask_path[0] if mask_path else None
 
@@ -103,7 +100,7 @@ def analyze_bbox(request):
             stats=stats_clean,
             metadata_json=outputs.get("metadata_json"),
             stats_json=outputs.get("stats_json"),
-            fig_path=outputs.get("fig"),
+            fig_path=blended_path,
             mask_path=mask_path,
             change_log_path=outputs.get("change_log"),
             bbox_minx=bbox[0],
@@ -113,38 +110,85 @@ def analyze_bbox(request):
             cache_key=cache_key
         )
 
-        preview_path = outputs.get("fig") or mask_path or preview_overlay_path
-        img_b64 = None
-        if preview_path and os.path.exists(preview_path):
-            with open(preview_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        # preview_path = outputs.get("fig") or mask_path or preview_overlay_path
+        # img_b64 = None
+        # if preview_path and os.path.exists(preview_path):
+        #     with open(preview_path, "rb") as f:
+        #         img_b64 = base64.b64encode(f.read()).decode("utf-8")
+        original_image_b64 = None
+        mask_image_b64 = None
+        blended_image_b64 = None
 
+        if cropped_path and os.path.exists(cropped_path):
+            with open(cropped_path, "rb") as f:
+                original_image_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        if mask_path and os.path.exists(mask_path):
+            with open(mask_path, "rb") as f:
+                mask_image_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        if blended_path and os.path.exists(blended_path):
+            with open(blended_path, "rb") as f:
+                blended_image_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        tabs = [
+            {
+                "key": "area",
+                "label": "Area (km²)",
+                "data": stats_clean.get("areas_sq_km", {})
+            },
+            {
+                "key": "percentage",
+                "label": "Area (%)",
+                "data": stats_clean.get("areas_pct", {})
+            },
+            {
+                "key": "density",
+                "label": "Density",
+                "data": stats_clean.get("density", 0)  # density not density_default
+            },
+            {
+                "key": "fragmentation",
+                "label": "Fragmentation",
+                "data": stats_clean.get("fragmentation", {})
+            },
+            {
+                "key": "adjacency",
+                "label": "Adjacency Matrix",
+                "data": stats_clean.get("adjacency", {})
+            }
+        ]
 
         return JsonResponse({
             "cached": False,
             "analysis_id": a.id,
             "stats": stats_clean,
-            "tabs": [
-                {"key": "area", "label": "Area (km²)", "data": stats_clean["areas_sq_km"]},
-                {"key": "percentage", "label": "Area (%)", "data": stats_clean["areas_pct"]},
-                {"key": "density", "label": "Density", "data": stats_clean["density"]},
-                {"key": "fragmentation", "label": "Fragmentation", "data": stats_clean["fragmentation"]},
-                {"key": "adjacency", "label": "Adjacency Matrix", "data": stats_clean["adjacency"]},
-            ],
-            "paths": to_serializable(outputs),
-            "preview_image": f"data:image/jpeg;base64,{img_b64}" if img_b64 else None,
-            "progress": [
-                {"step": "extracting_tiles", "label": "Extracting map tiles", "done": True},
-                {"step": "cropping", "label": "Cropping area", "done": mode == "cropped"},
-                {"step": "analyzing", "label": "Analyzing area", "done": True},
-                {"step": "saving", "label": "Saving results", "done": True},
-            ]
+            "tabs": tabs,
+            "mask_image": f"data:image/png;base64,{mask_image_b64}" if mask_image_b64 else None,
+            "preview_image": f"data:image/png;base64,{blended_image_b64}" if blended_image_b64 else None,
+                "original": cropped_path,
+                "mask": mask_path,
+                "blended": blended_path
+            }
         })
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
+
+def make_bbox_cache_key(bbox, model_path, params, zoom):
+    import json
+
+    data = {
+        'bbox': [round(coord, 6) for coord in bbox],
+        'model': os.path.basename(model_path),
+        'zoom': zoom,
+        'params': params
+    }
+    key_str = json.dumps(data, sort_keys=True)
+    return hashlib.sha256(key_str.encode()).hexdigest()[:32]
+
 
 def tile_from_mbtiles(request, z, x, y):
     mbtiles_path = "data/raw/satellite-2017-11-02_europe_poland.mbtiles"
@@ -256,19 +300,41 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
     if not wojewodztwo:
         raise Http404("Województwo not found")
 
-    analysis = WojewodztwoAnalysis.objects.filter(
+    all_analyses = WojewodztwoAnalysis.objects.filter(
         wojewodztwo_id=wojewodztwo_id
-    ).order_by('-created_at').first()
+    ).order_by('-created_at')
+
+    selected_analysis_id = request.GET.get('analysis_id')
+    if selected_analysis_id:
+        analysis = all_analyses.filter(id=selected_analysis_id).first()
+    else:
+        analysis = all_analyses.first()
 
     poland_averages = None
     if analysis:
-        all_analyses = WojewodztwoAnalysis.objects.all()
-        if all_analyses.exists():
-            poland_averages = calculate_poland_averages(all_analyses)
+        all_woj_analyses = WojewodztwoAnalysis.objects.all()
+        if all_woj_analyses.exists():
+            poland_averages = calculate_poland_averages(all_woj_analyses)
 
     bounds = wojewodztwo['bounds']
     center_lat = (bounds[1] + bounds[3]) / 2
     center_lon = (bounds[0] + bounds[2]) / 2
+
+    analyses_list = []
+    for a in all_analyses:
+        config = a.config or {}
+        mode = config.get('ANALYSIS_MODE', 'unknown')
+        smoothing = config.get('APPLY_SMOOTHING', False)
+
+        analyses_list.append({
+            'id': a.id,
+            'created_at': a.created_at.strftime("%Y-%m-%d %H:%M"),
+            'mode': mode,
+            'zoom': a.zoom,
+            'smoothing': smoothing,
+            'model': os.path.basename(a.model_path),
+            'is_current': a.id == (analysis.id if analysis else None)
+        })
 
     context = {
         'wojewodztwo': {
@@ -283,6 +349,8 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
         'title': f"Analysis for {wojewodztwo['nazwa'].capitalize()}",
         'has_analysis': analysis is not None,
         'poland_averages': json.dumps(poland_averages) if poland_averages else None,
+        'analyses_list': json.dumps(analyses_list),
+        'analyses_count': len(analyses_list),
     }
 
     if analysis:
@@ -292,41 +360,122 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
             {"key": "percentage", "label": "Area (%)", "data": stats.get("areas_pct", {})},
             {"key": "density", "label": "Density", "data": stats.get("density")},
             {"key": "adjacency", "label": "Adjacency Matrix", "data": stats.get("adjacency", {})},
+            {"key": "fragmentation", "label": "Fragmentation", "data": stats.get("fragmentation", {})}
         ]
-        #  todo dla ogolnych stats dodac indeksy ndvi ndwi
+
+        config = analysis.config or {}
         wojewodztwo_stats = {
             'Total Area': f"{analysis.total_area_km2:.2f} km²" if analysis.total_area_km2 else "N/A",
             'Analysis Date': analysis.created_at.strftime("%Y-%m-%d %H:%M"),
             'Model': os.path.basename(analysis.model_path),
+            'Mode': config.get('ANALYSIS_MODE', 'N/A'),
+            'Tile Size': f"{config.get('TILE_SIZE', 'auto')}px",
+            'Zoom Level': str(analysis.zoom),
         }
 
-        original_image = None
-        mask_image = None
-        blended_image = None
+        def get_thumb_path(original_path):
+                return None
+            base, ext = os.path.splitext(original_path)
+            return f"{base}_thumb.jpg"
 
+        def ensure_thumbnail(original_path):
+            if not original_path or not os.path.exists(original_path):
+                print(f"[DEBUG] Original path missing: {original_path}")
+                return None
+
+            thumb_path = get_thumb_path(original_path)
+
+            if not os.path.exists(thumb_path):
+                try:
+                    from Classifier.src.postprocess import create_thumbnail
+                    thumb_path = create_thumbnail(original_path, max_size=(800, 800), quality=85)
+                    print(f"[DEBUG] Created thumb: {thumb_path}")
+                except Exception as e:
+                    print(f"[ERROR] Could not create thumbnail: {e}")
+                    return None
+
+            return thumb_path
+
+        boundary_image_path = None
         if analysis.cropped_image_path and os.path.exists(analysis.cropped_image_path):
-            with open(analysis.cropped_image_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                original_image = f"data:image/jpeg;base64,{img_b64}"
+            try:
+                from Classifier.src.postprocess import create_boundary_version
+                boundary_image_path = create_boundary_version(
+                    cropped_image_path=analysis.cropped_image_path,
+                    geometry=wojewodztwo['geometry'],
+                    bounds=wojewodztwo['bounds'],
+                    zoom=analysis.zoom
+                )
+                print(f"[DEBUG] b image: {boundary_image_path}")
+            except Exception as e:
+                boundary_image_path = analysis.cropped_image_path
 
+        image_data = {}
+        display_image = boundary_image_path or analysis.cropped_image_path
+
+        if display_image and os.path.exists(display_image):
+            thumb_path = ensure_thumbnail(display_image)
+
+            if thumb_path and os.path.exists(thumb_path):
+                try:
+                    with open(thumb_path, "rb") as f:
+                        thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
+                        image_data['original_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
+                except Exception as e:
+                    print(f"[ERROR] no thumb to read thumb: {e}")
+
+            rel_path = os.path.relpath(display_image, settings.MEDIA_ROOT)
+            image_data['original_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
+
+            if analysis.cropped_image_path:
+                rel_path_orig = os.path.relpath(analysis.cropped_image_path, settings.MEDIA_ROOT)
+                image_data['original_download'] = f"{settings.MEDIA_URL}{rel_path_orig}".replace('\\', '/')
+
+            print(f"[DEBUG] original: {image_data['original_url']}")
+
+        print(f"\n[DEBUG] process mask mask: {analysis.mask_path}")
         if analysis.mask_path and os.path.exists(analysis.mask_path):
-            with open(analysis.mask_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                mask_image = f"data:image/png;base64,{img_b64}"
+            thumb_path = ensure_thumbnail(analysis.mask_path)
 
+            if thumb_path and os.path.exists(thumb_path):
+                try:
+                    with open(thumb_path, "rb") as f:
+                        thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
+                        image_data['mask_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
+                except Exception as e:
+                    print(f"[ERROR] no thumb to read thumb: {e}")
+
+            rel_path = os.path.relpath(analysis.mask_path, settings.MEDIA_ROOT)
+            image_data['mask_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
+            image_data['mask_download'] = image_data['mask_url']  # Same for download
+            print(f"[DEBUG] Mask URL: {image_data['mask_url']}")
+
+        # Blended image
+        print(f"\n[DEBUG] process blended: {analysis.fig_path}")
         if analysis.fig_path and os.path.exists(analysis.fig_path):
-            with open(analysis.fig_path, "rb") as f:
-                img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                blended_image = f"data:image/png;base64,{img_b64}"
+            thumb_path = ensure_thumbnail(analysis.fig_path)
+
+            if thumb_path and os.path.exists(thumb_path):
+                try:
+                    with open(thumb_path, "rb") as f:
+                        thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
+                        image_data['blended_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
+                except Exception as e:
+                    print(f"[ERROR] Failed to read thumb: {e}")
+
+            rel_path = os.path.relpath(analysis.fig_path, settings.MEDIA_ROOT)
+            image_data['blended_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
+            image_data['blended_download'] = image_data['blended_url']  # Same for download
+            print(f"[DEBUG] Blended URL: {image_data['blended_url']}")
+
+        print(f"\n[DEBUG] Final image_data keys: {image_data.keys()}")
 
         context.update({
             'analysis': analysis,
             'stats_json': json.dumps(stats),
             'tabs_json': json.dumps(tabs),
             'wojewodztwo_stats': wojewodztwo_stats,
-            'original_image': original_image,
-            'mask_image': mask_image,
-            'blended_image': blended_image,
+            'image_data': json.dumps(image_data),
         })
 
     return render(request, 'wojewodztwo_detail.html', context)
@@ -401,7 +550,8 @@ def analyze_wojewodztwo(request):
         if not wojewodztwo:
             return JsonResponse({"error": f"Województwo {wojewodztwo_id} not found"}, status=404)
 
-        cache_key = make_wojewodztwo_cache_key(wojewodztwo_id, model_path, params)
+        # FIXED: Include all params in cache key
+        cache_key = make_wojewodztwo_cache_key(wojewodztwo_id, model_path, params, zoom)
 
         if not force_recompute:
             cached = WojewodztwoAnalysis.objects.filter(cache_key=cache_key).first()
@@ -412,6 +562,7 @@ def analyze_wojewodztwo(request):
                     "message": "Using cached analysis",
                     "redirect_url": f"/wojewodztwo/{wojewodztwo_id}/"
                 })
+
         mbtiles_path = os.path.join(
             settings.BASE_DIR,
             "data/raw/satellite-2017-11-02_europe_poland.mbtiles"
@@ -419,61 +570,91 @@ def analyze_wojewodztwo(request):
         if not os.path.exists(mbtiles_path):
             return JsonResponse({"error": f"MBTiles not found: {mbtiles_path}"}, status=500)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         wojewodztwo_slug = unify_lang_file(wojewodztwo['nazwa'])
-
         output_base = os.path.join(
             settings.MEDIA_ROOT,
             f"Classifier/outputs/wojewodztwa/{wojewodztwo_slug}"
         )
         os.makedirs(output_base, exist_ok=True)
-        conn = sqlite3.connect(mbtiles_path)
-        cur = conn.cursor()
-        cur.execute("SELECT MAX(zoom_level) FROM tiles")
-        max_zoom_result = cur.fetchone()
-        conn.close()
 
-        max_available_zoom = max_zoom_result[0] if max_zoom_result and max_zoom_result[0] else 13
-        # max or specified
-        actual_zoom = min(zoom, max_available_zoom)
-
-        print(f"[INFO]zoom level {actual_zoom} (max available: {max_available_zoom})")
-        stitched_path = os.path.join(
+        # FIXED: Check for existing base cropped image (zoom-specific)
+        base_cropped_path = os.path.join(
             output_base,
-            f"{wojewodztwo_slug}_{timestamp}_stitched.jpg"
+            f"{wojewodztwo_slug}_zoom{zoom}_cropped.jpg"
         )
-
-        bbox = wojewodztwo['bounds']
-        stitched_path = extract_tiles_from_mbtiles(
-            mbtiles_path=mbtiles_path,
-            bbox=bbox,
-            zoom=actual_zoom,
-            output_path=stitched_path
-        )
-
-        if not os.path.exists(stitched_path):
-            return JsonResponse({"error": "Failed to extract tiles"}, status=500)
-
-        # maska
-        img = cv2.imread(stitched_path)
-        if img is None:
-            return JsonResponse({
-                "error": f"Failed to read extracted image: {stitched_path}"
-            }, status=500)
-        # specyficzne for wojewodztwo_processor
-        mask = create_mask_from_geometry(
-            img.shape,
-            wojewodztwo['shapely_geom'],
-            bbox,
-            actual_zoom
-        )
-        cropped_path = os.path.join(
+        base_mask_path = os.path.join(
             output_base,
-            f"{wojewodztwo_slug}_{timestamp}_cropped.jpg"
+            f"{wojewodztwo_slug}_zoom{zoom}_cropped_mask.png"
         )
-        cropped_path, cropped_mask, crop_offset = crop_image_by_mask(
-            stitched_path, mask, cropped_path
-        )
+
+            print(f"[INFO] cropp debug stitched missing {zoom}")
+            cropped_path = base_cropped_path
+            cropped_mask = cv2.imread(base_mask_path, cv2.IMREAD_GRAYSCALE)
+
+            if not os.path.exists(stitched_path):
+                conn = sqlite3.connect(mbtiles_path)
+                cur = conn.cursor()
+                cur.execute("SELECT MAX(zoom_level) FROM tiles")
+                max_zoom_result = cur.fetchone()
+                conn.close()
+                max_available_zoom = max_zoom_result[0] if max_zoom_result and max_zoom_result[0] else 13
+                actual_zoom = min(zoom, max_available_zoom)
+
+                bbox = wojewodztwo['bounds']
+                stitched_path = os.path.join(
+                    output_base,
+                    f"{wojewodztwo_slug}_zoom{actual_zoom}_stitched.jpg"
+                )
+                stitched_path = extract_tiles_from_mbtiles(
+                    mbtiles_path=mbtiles_path,
+                    bbox=bbox,
+                    zoom=actual_zoom,
+                    output_path=stitched_path
+                )
+        else:
+            print(f"[INFO] Creating new cropped image for zoom {zoom}")
+            conn = sqlite3.connect(mbtiles_path)
+            cur = conn.cursor()
+            cur.execute("SELECT MAX(zoom_level) FROM tiles")
+            max_zoom_result = cur.fetchone()
+            conn.close()
+
+            max_available_zoom = max_zoom_result[0] if max_zoom_result and max_zoom_result[0] else 13
+            actual_zoom = min(zoom, max_available_zoom)
+
+            print(f"[INFO] Zoom level {actual_zoom}")
+
+            bbox = wojewodztwo['bounds']
+            stitched_path = os.path.join(
+                output_base,
+                f"{wojewodztwo_slug}_zoom{actual_zoom}_stitched.jpg"
+            )
+            stitched_path = extract_tiles_from_mbtiles(
+                mbtiles_path=mbtiles_path,
+                bbox=bbox,
+                zoom=actual_zoom,
+                output_path=stitched_path
+            )
+
+            if not os.path.exists(stitched_path):
+                return JsonResponse({"error": "Failed to extract tiles"}, status=500)
+
+            # Create mask
+            img = cv2.imread(stitched_path)
+            if img is None:
+                return JsonResponse({
+                    "error": f"Failed to read extracted image: {stitched_path}"
+                }, status=500)
+
+            mask = create_mask_from_geometry(
+                img.shape,
+                wojewodztwo['shapely_geom'],
+                bbox,
+                actual_zoom
+            )
+
+                stitched_path, mask, base_cropped_path
+            )
 
         stats, outputs = run_analysis(
             image_path=cropped_path,
@@ -481,8 +662,8 @@ def analyze_wojewodztwo(request):
             options={
                 **params,
                 'mask': cropped_mask,
-                'zoom': actual_zoom,
-                'bounds': bbox
+                'zoom': zoom,
+                'bounds': wojewodztwo['bounds']
             }
         )
 
@@ -491,17 +672,19 @@ def analyze_wojewodztwo(request):
 
         if isinstance(mask_path, list):
             mask_path = mask_path[0] if mask_path else None
+
         stats_clean = normalize_stats(stats)
         total_area_km2 = calculate_geospat(wojewodztwo['shapely_geom'])
+
         analysis = WojewodztwoAnalysis.objects.create(
             wojewodztwo_id=wojewodztwo['id'],
             wojewodztwo_name=wojewodztwo['nazwa'],
             geometry=wojewodztwo['geometry'],
-            bounds=bbox,
+            bounds=wojewodztwo['bounds'],
             model_path=model_path,
-            config=params,
-            zoom=actual_zoom,
-            original_image_path=stitched_path,
+            config=params,  # Store full params for display
+            zoom=zoom,
+            original_image_path=stitched_path if 'stitched_path' in locals() else None,
             cropped_image_path=cropped_path,
             mask_path=mask_path if mask_path and os.path.exists(str(mask_path)) else None,
             fig_path=blended_path if blended_path and os.path.exists(str(blended_path)) else None,
@@ -547,7 +730,6 @@ def wojewodztwo_tiles(request, wojewodztwo_id, z, x, y):
         # MBTiles uses TMS, so we need to flip Y
         # For TMS: y_tms = (2^z - 1) - y_xyz
         y_tms = (2 ** int(z) - 1) - int(y)
-
         cur.execute(
             "SELECT tile_data FROM tiles WHERE zoom_level=? AND tile_column=? AND tile_row=?",
             (z, x, y_tms)

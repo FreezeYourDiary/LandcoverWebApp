@@ -18,3 +18,52 @@ background: var(--accent-default);
 color: white;
 border-color: var(--accent-default);
 }
+
+.analysis-selector {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-light);
+    border-radius: 4px;
+}
+.analysis-selector select {
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+.analysis-info {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-light);
+}
+
+/* Image viewer styles */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--bg-light);
+    border-top-color: var(--accent-default);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#imageContainer.grabbing {
+    cursor: grabbing !important;
+}
+
+#imageContainer.zoom-in {
+    cursor: zoom-in;
+}
+
+#imageContainer.zoom-out {
+    cursor: zoom-out;
+}
+
+.zoomable-image.loading {
+    opacity: 0.5;
+}

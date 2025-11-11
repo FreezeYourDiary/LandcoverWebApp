@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'Classifier.apps.ClassifierConfig',
+    'django_extensions'
 ]
 
 MIDDLEWARE = [
@@ -83,7 +84,10 @@ DATABASES = {
     }
 }
 
-
+GRAPH_MODELS = {
+  'all_applications': True,
+  'group_models': True,
+}
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

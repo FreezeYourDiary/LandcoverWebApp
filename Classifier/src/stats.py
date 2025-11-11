@@ -1,5 +1,3 @@
-# Classifier/src/stats.py - FIXED area calculation
-
 import numpy as np
 import cv2
 from scipy import ndimage as ndi
@@ -94,14 +92,19 @@ def compute_density(classification_mask, class_names, target_classes=None):
 
 
 def compute_fragmentation_index(classification_mask, class_names):
-    """Fragmentation index = number of distinct patches per class / total area."""
     frag = {}
+    print("\n[FRAGMENTATION DEBUG]")
     for cls in class_names:
         color = np.array(list(COLORS[cls]))
         mask = np.all(classification_mask == color, axis=-1)
         labeled, num_features = ndi.label(mask)
         area = np.sum(mask)
-        frag[cls] = num_features / area if area > 0 else 0
+        frag_value = num_features / area if area > 0 else 0
+
+        print(f"{cls:20s}: {num_features:4d} patches, {area:8d} pixels → {frag_value:.8f}")
+        frag[cls] = frag_value
+    #     AnnualCrop : 6 patches, 24576 pixels → 0.00024414
+    #     Forest : 10 patches, 65536 pixels → 0.00015259
     return frag
 
 
@@ -141,16 +144,26 @@ def normalize_stats(stats: dict):
     """Round for json"""
 
     def round_values(d):
+        if not isinstance(d, dict):
+            return d
         return {k: round(v, 4) if isinstance(v, (int, float)) else v for k, v in d.items()}
 
+    areas_sq_km = stats.get("areas_sq_km", {})
+    areas_pct = stats.get("areas_pct", {})
+    fragmentation = stats.get("fragmentation_index", {})
+    adjacency = stats.get("adjacency_proportions", {})
+    density = stats.get("density_default", 0)
+
+    # upd cleaned up
     clean = {
-        "areas_sq_km": round_values(stats.get("areas_sq_km", {})),
-        "areas_pct": round_values(stats.get("areas_pct", {})),
-        "fragmentation": round_values(stats.get("fragmentation_index", {})),
+        "areas_sq_km": round_values(areas_sq_km),
+        "areas_pct": round_values(areas_pct),
+        "fragmentation": round_values(fragmentation),
         "adjacency": {
-            c1: round_values(c2dict)
-            for c1, c2dict in stats.get("adjacency_proportions", {}).items()
-        },
-        "density": round(stats.get("density_default", 0), 4),
+            c1: round_values(c2dict) if isinstance(c2dict, dict) else {}
+            for c1, c2dict in adjacency.items()
+        } if adjacency else {},
+        "density": round(density, 4) if isinstance(density, (int, float)) else 0,
     }
+
     return clean

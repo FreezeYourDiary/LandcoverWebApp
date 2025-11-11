@@ -221,9 +221,9 @@ dialog::backdrop {
 }
 
 .tab-btn.active {
-  background: #007bff;
+  background: #db3453;
   color: white;
-  border-color: #007bff;
+  border-color: #1a1a27;
 }
 
 .simple-table {
@@ -256,4 +256,12 @@ dialog::backdrop {
 .show-all-btn {
     margin-top: 10px;
     width: 100%;
+}
+#tabsHeader {
+display: flex;
+gap: 0.5rem;
+margin-bottom: 1rem;
+padding-bottom: 0.5rem;
+border-bottom: 2px solid var(--border-color);
+flex-wrap: wrap;
 }

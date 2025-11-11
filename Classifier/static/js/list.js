@@ -21,6 +21,30 @@ document.addEventListener("DOMContentLoaded", function() {
     attribution: '© Satellite'
   }).addTo(map);
 
+  //+tooltips
+  const analysisModeSelect = document.getElementById('analysisMode');
+  analysisModeSelect.addEventListener('change', function() {
+    const mode = this.value;
+    const helpText = this.nextElementSibling;
+
+    if (mode === 'detailed') {
+      helpText.innerHTML = `
+        <strong>Szczegółowy:</strong> 32x32 kafle z kontekstem 64x64<br>
+        • Hierarchiczna klasyfikacja (64x64 → 32x32)<br>
+        • Priorytety klas: Forest 1.4×, Highway/SeaLake 0.8×<br>
+        • Naprawa izolowanych SeaLake<br>
+        • Najlepsza jakość, wolniejszy
+      `;
+    } else {
+      helpText.innerHTML = `
+        <strong>Szybki:</strong> 64x64 kafle z priorytetami klas<br>
+        • Pojedyncza skala klasyfikacji<br>
+        • Priorytety klas: Forest 1.4×, Highway/SeaLake 0.8×<br>
+        • Szybszy ale mniej szczegółowy
+      `;
+    }
+  });
+
   async function addPolandBorders() {
     try {
       const [countryResp, wojResp] = await Promise.all([
@@ -110,6 +134,7 @@ document.addEventListener("DOMContentLoaded", function() {
       el.classList.remove('selected');
     });
     item.classList.add('selected');
+
     if (geojsonLayer) {
       geojsonLayer.eachLayer(layer => {
         if (layer.feature.properties.id === id) {
@@ -133,9 +158,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     modalTitle.textContent = `Configure Analysis: ${nazwa.charAt(0).toUpperCase() + nazwa.slice(1)}`;
 
-    // todo ui button dla okna
     if (analyzed) {
-      if (confirm(`${nazwa} Juz bylo przeanalizowane. Chcesz zobaczyc strone?`)) {
+      if (confirm(`${nazwa} już było przeanalizowane. Chcesz zobaczyć stronę?`)) {
         window.location.href = `/wojewodztwo/${id}/`;
       } else {
         configModal.showModal();
@@ -158,12 +182,16 @@ document.addEventListener("DOMContentLoaded", function() {
 
   function runAnalysis(wojewodztwoId) {
     const overlay = document.getElementById('loadingOverlay');
+    const statusText = document.getElementById('loadingStatus');
     overlay.style.display = 'flex';
 
     const modelPath = document.getElementById('modelSelect').value;
-    const tileSize = parseInt(document.getElementById('tileSize').value);
+    const analysisMode = document.getElementById('analysisMode').value;
     const zoomLevel = parseInt(document.getElementById('zoomLevel').value);
     const applySmoothing = document.getElementById('applySmoothing').checked;
+    const fixSeaLake = document.getElementById('fixSeaLake').checked;
+
+    statusText.textContent = `Rozpoczynanie analizy (${analysisMode})...`;
 
     fetch('/api/analyze-wojewodztwo/', {
       method: 'POST',
@@ -174,8 +202,9 @@ document.addEventListener("DOMContentLoaded", function() {
         wojewodztwo_id: wojewodztwoId,
         model_path: modelPath,
         params: {
-          TILE_SIZE: tileSize,
-          APPLY_SMOOTHING: applySmoothing
+          ANALYSIS_MODE: analysisMode,
+          APPLY_SMOOTHING: applySmoothing,
+          FIX_SEALAKE: fixSeaLake
         },
         zoom: zoomLevel,
         force_recompute: false
@@ -184,7 +213,10 @@ document.addEventListener("DOMContentLoaded", function() {
     .then(res => res.json())
     .then(data => {
       if (data.success || data.cached) {
-        window.location.href = data.redirect_url;
+        statusText.textContent = 'Analiza zakończona! Przekierowywanie...';
+        setTimeout(() => {
+          window.location.href = data.redirect_url;
+        }, 500);
       } else {
         alert('Analysis failed: ' + (data.error || 'Unknown error'));
         overlay.style.display = 'none';

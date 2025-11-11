@@ -1,4 +1,3 @@
-# Classifier/src/utils/wojewodztwo_processor.py
 import json
 import os
 import cv2
@@ -20,9 +19,7 @@ def unify_lang_file(filename):
 
 
 def load_wojewodztwa_geojson(geojson_path):
-    """
-    loadgeojson, get bounds (shape)
-    """
+    """Load geojson, get bounds (shape)"""
     with open(geojson_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -57,10 +54,12 @@ def create_mask_from_geometry(image_shape, geometry, bounds, zoom):
     mask = np.zeros((h, w), dtype=np.uint8)
 
     minx, miny, maxx, maxy = bounds
+
     def lonlat_to_pixel(lon, lat):
         x_pct = (lon - minx) / (maxx - minx)
         y_pct = (maxy - lat) / (maxy - miny)  # Flip Y
         return int(x_pct * w), int(y_pct * h)
+
     if isinstance(geometry, MultiPolygon):
         polygons = list(geometry.geoms)
     elif isinstance(geometry, Polygon):
@@ -73,7 +72,7 @@ def create_mask_from_geometry(image_shape, geometry, bounds, zoom):
         pts = np.array([lonlat_to_pixel(lon, lat) for lon, lat in exterior_coords], dtype=np.int32)
         cv2.fillPoly(mask, [pts], 255)
 
-        # holesy
+        # holes
         for interior in polygon.interiors:
             interior_coords = list(interior.coords)
             pts = np.array([lonlat_to_pixel(lon, lat) for lon, lat in interior_coords], dtype=np.int32)
@@ -84,7 +83,7 @@ def create_mask_from_geometry(image_shape, geometry, bounds, zoom):
 
 def crop_image_by_mask(image_path, mask, output_path):
     """
-        crop by binary mask
+    Crop by binary mask
     Args:
         image_path: Path to input image
         mask: Binary mask (0/255)
@@ -106,8 +105,6 @@ def crop_image_by_mask(image_path, mask, output_path):
     cropped_img = img[y:y + h, x:x + w]
     cropped_mask = mask[y:y + h, x:x + w]
 
-    # riginal for display
-    # mask for classification todo skip tense?
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, cropped_img)
     mask_output_path = output_path.replace('.jpg', '_mask.png')
@@ -116,13 +113,14 @@ def crop_image_by_mask(image_path, mask, output_path):
     return output_path, cropped_mask, (x, y)
 
 
-def make_wojewodztwo_cache_key(wojewodztwo_id, model_path, params):
+def make_wojewodztwo_cache_key(wojewodztwo_id, model_path, params, zoom):
     """
     woj cache
     """
     data = {
         'wojewodztwo_id': wojewodztwo_id,
         'model': os.path.basename(model_path),
+        'zoom': zoom,
         'params': params
     }
     key_str = json.dumps(data, sort_keys=True)
@@ -130,9 +128,7 @@ def make_wojewodztwo_cache_key(wojewodztwo_id, model_path, params):
 
 
 def calculate_geospat(geometry):
-    """
-
-    """
+    """Calculate area in km²"""
     try:
         # Create GeoDataFrame with WGS84 (EPSG:4326)
         gdf = gpd.GeoDataFrame([1], geometry=[geometry], crs="EPSG:4326")

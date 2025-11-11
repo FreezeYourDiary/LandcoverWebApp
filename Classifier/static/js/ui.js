@@ -1,10 +1,11 @@
 const paramModal = document.getElementById('paramModal');
-const preview = document.getElementById('preview');
 const statsBars = document.getElementById('statsBars');
 const progressPanel = document.getElementById('progressPanel');
 const downloadJsonBtn = document.getElementById('downloadJsonBtn');
 const viewRawJsonBtn = document.getElementById('viewRawJsonBtn');
+const imagesCard = document.getElementById('imagesCard');
 let currentStats = null;
+let currentImages = null;
 
 /**
  * UI not freeze fix reset UI if rectangle draw basically
@@ -15,8 +16,9 @@ export function resetStatsUI() {
   statsBars.innerHTML = "Analiza rozpocznie się po wybraniu strefy, którą chcesz przeanalizować na mapie.";
   downloadJsonBtn.style.display = 'none';
   viewRawJsonBtn.style.display = 'none';
-  preview.style.display = 'none';
+  if (imagesCard) imagesCard.style.display = 'none';
   currentStats = null;
+  currentImages = null;
 }
 
 /**
@@ -39,31 +41,125 @@ export function setProgress(index) {
  * @param {Array} tabs - tab configuration array.
  * @param {string} [preview_image] - TODO fix preview
  */
-export function displayResults({ stats, tabs, preview_image }) {
+export function displayResults({ stats, tabs, preview_image, original_image, mask_image }) {
+  console.log('[DEBUG] displayResults called with:', { stats, tabs, preview_image, original_image, mask_image });
+
   currentStats = stats;
+  currentImages = {
+    original: original_image,
+    mask: mask_image,
+    preview: preview_image
+  };
+
   downloadJsonBtn.style.display = 'inline-block';
   viewRawJsonBtn.style.display = 'inline-block';
-  if (tabs && tabs.length > 0) createTabs(tabs);
-  else drawStatsBars({ areas_pct: stats });
 
-  if (preview_image) {
-    preview.src = preview_image;
-    preview.style.display = "block";
-    preview.style.opacity = "1";
+  if (tabs && tabs.length > 0) {
+    console.log('[DEBUG] + tabs:', tabs);
+    createTabs(tabs);
   } else {
-    preview.style.display = 'none';
+    console.log('[DEBUG] default bars');
+    drawStatsBars({ areas_pct: stats.areas_pct || {} });
+  }
+
+  if (original_image || mask_image || preview_image) {
+    displayImages({
+      original: original_image,
+      mask: mask_image,
+      blended: preview_image
+    });
+  } else {
+    console.log('[DEBUG] no images');
   }
 }
+
+function displayImages(images) {
+  if (!imagesCard) return;
+
+  imagesCard.style.display = 'block';
+
+  const originalImg = document.getElementById('originalImage');
+  const maskImg = document.getElementById('maskImage');
+  const blendedImg = document.getElementById('blendedImage');
+  const downloadOriginalBtn = document.getElementById('downloadOriginalBtn');
+  const downloadMaskBtn = document.getElementById('downloadMaskBtn');
+
+  if (images.original && originalImg) {
+    originalImg.src = images.original;
+    setupImageZoom(originalImg);
+    if (downloadOriginalBtn) {
+      downloadOriginalBtn.style.display = 'inline-block';
+      downloadOriginalBtn.onclick = () => downloadImage(images.original, 'original.jpg');
+    }
+  }
+
+  if (images.mask && maskImg) {
+    maskImg.src = images.mask;
+    setupImageZoom(maskImg);
+    if (downloadMaskBtn) {
+      downloadMaskBtn.style.display = 'inline-block';
+      downloadMaskBtn.onclick = () => downloadImage(images.mask, 'mask.png');
+    }
+  }
+
+  if (images.blended && blendedImg) {
+    blendedImg.src = images.blended;
+    setupImageZoom(blendedImg);
+  }
+
+  document.querySelectorAll('#imagesCard .image-control-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const view = this.dataset.view;
+
+      document.querySelectorAll('#imagesCard .image-control-btn').forEach(b => {
+        b.classList.remove('active');
+      });
+      this.classList.add('active');
+
+      document.querySelectorAll('.image-layer').forEach(layer => {
+        layer.classList.remove('active');
+        layer.style.opacity = '0';
+      });
+      const targetLayer = document.querySelector(`[data-layer="${view}"]`);
+      if (targetLayer) {
+        targetLayer.classList.add('active');
+        targetLayer.style.opacity = '1';
+      }
+    });
+  });
+}
+
+function setupImageZoom(img) {
+  let zoomed = false;
+
+  img.addEventListener('click', function() {
+    if (!zoomed) {
+      this.style.maxWidth = 'none';
+      this.style.maxHeight = 'none';
+      this.style.cursor = 'zoom-out';
+      this.parentElement.style.overflow = 'auto';
+      zoomed = true;
+    } else {
+      this.style.maxWidth = '100%';
+      this.style.maxHeight = '100%';
+      this.style.cursor = 'zoom-in';
+      this.parentElement.style.overflow = 'hidden';
+      zoomed = false;
+    }
+  });
+}
+
+function downloadImage(base64Data, filename) {
+  const link = document.createElement('a');
+  link.href = base64Data;
+  link.download = filename;
+  link.click();
+}
+
 export function viewRawStats() {
   if (!currentStats) return;
-  // json in other page GITHUBLIKE code<>/raw/download
-  const blob = new Blob([JSON.stringify(currentStats, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-
-  const win = window.open(url, '_blank');
-  if (win) {
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
+  const win = window.open('', '_blank');
+  win.document.write('<pre>' + JSON.stringify(currentStats, null, 2) + '</pre>');
 }
 
 export function downloadStats() {
@@ -80,44 +176,160 @@ export function downloadStats() {
 function createTabs(tabs) {
   const tabsHeader = document.getElementById('tabsHeader');
   tabsHeader.innerHTML = "";
-  const filteredTabs = tabs.filter(t => t.key !== "adjacency");
 
-  filteredTabs.forEach((tab, i) => {
+  let currentTab = tabs[0].key; // Start with first tab
+
+  tabs.forEach((tab, i) => {
     const btn = document.createElement('button');
+    btn.className = 'image-control-btn';
+    if (i === 0) btn.classList.add('active');
     btn.textContent = tab.label;
-    btn.className = "tab-btn" + (i === 0 ? " active" : "");
-    btn.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.addEventListener('click', () => {
+      currentTab = tab.key;
+      document.querySelectorAll('#tabsHeader .image-control-btn').forEach(b => {
+        b.classList.remove('active');
+      });
       btn.classList.add('active');
       showTabContent(tab);
-    };
+    });
     tabsHeader.appendChild(btn);
   });
 
-  if (filteredTabs.length > 0) showTabContent(filteredTabs[0]);
+  if (tabs.length > 0) showTabContent(tabs[0]);
 }
 
 function showTabContent(tab) {
   const container = document.getElementById('statsBars');
   container.innerHTML = "";
-  if (!tab.data || Object.keys(tab.data).length === 0) {
-    container.textContent = "Brak danych.";
+
+  console.log('[DEBUG] Showing tab:', tab.key, 'data:', tab.data);
+
+  // Handle density tab - WOJEWODZTWO PATTERN
+  if (tab.key === 'density') {
+    const value = tab.data || 0;
+    const percentage = (value * 100).toFixed(2);
+
+    container.innerHTML = `
+      <div style="padding: 2rem; text-align: center;">
+        <div style="font-size: 3rem; font-weight: 700; color: var(--accent-default); margin-bottom: 1rem;">
+          ${percentage}%
+        </div>
+        <div style="color: var(--text-light); margin-bottom: 1rem;">Gęstość zabudowy</div>
+        <div style="margin-top: 2rem; text-align: left; padding: 1rem; background: var(--bg-light); border-radius: 4px;">
+          <strong>Interpretacja:</strong><br>
+          ${percentage < 5 ? 'Obszar o bardzo niskiej zabudowie' : 
+            percentage < 15 ? 'Obszar o niskiej zabudowie' :
+            percentage < 30 ? 'Obszar o średniej zabudowie' :
+            percentage < 50 ? 'Obszar o wysokiej zabudowie' :
+            'Obszar silnie zurbanizowany'}
+        </div>
+      </div>
+    `;
     return;
   }
-  if (tab.key === "percentage") return drawStatsBars({ areas_pct: tab.data });
-  if (tab.key === "area") return drawTopAreas(tab.data);
+
+  if (tab.key === 'adjacency') {
+    renderAdjacencyMatrix(tab.data, container);
+    return;
+  }
+
+  if (tab.key === 'percentage') {
+    drawStatsBars({ areas_pct: tab.data });
+    return;
+  }
+
+  if (tab.key === 'area') {
+    drawTopAreas(tab.data);
+    return;
+  }
+
+  if (tab.key === 'fragmentation') {
+    drawFragmentation(tab.data);
+    return;
+  }
 
   const table = document.createElement('table');
   table.className = "simple-table";
-  for (const [k, v] of Object.entries(tab.data)) {
+  for (const [k, v] of Object.entries(tab.data || {})) {
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${k}</td><td>${typeof v === 'number' ? v.toFixed(3) : v}</td>`;
+    const val = typeof v === 'number' ? v.toFixed(3) : v;
+    row.innerHTML = `<td>${k}</td><td style="text-align:right;">${val}</td>`;
     table.appendChild(row);
   }
   container.appendChild(table);
 }
 
-// === Percentage bars ===
+function renderAdjacencyMatrix(data, container) {
+  if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:2rem;">Brak danych macierzy sąsiedztwa</p>';
+    return;
+  }
+
+  const classes = Object.keys(data);
+  let html = '<div style="overflow-x: auto; padding: 1rem;"><table class="simple-table" style="border-collapse: collapse;"><tr><th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light);"></th>';
+
+  classes.forEach(c => {
+    html += `<th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light); font-size: 0.75rem;">${c}</th>`;
+  });
+  html += '</tr>';
+
+  classes.forEach(class1 => {
+    html += `<tr><th style="padding: 8px; border: 1px solid var(--border-color); background: var(--bg-light); text-align: left; font-size: 0.75rem;">${class1}</th>`;
+    classes.forEach(class2 => {
+      const value = data[class1]?.[class2] || 0;
+      const percentage = (value * 100).toFixed(2);
+      const intensity = Math.min(value / 0.2, 1);
+      const bgColor = class1 === class2 ? 'var(--bg-light)' : `rgba(255, 12, 80, ${intensity * 0.7})`;
+      const textColor = intensity > 0.5 && class1 !== class2 ? 'white' : 'var(--text-default)';
+      html += `<td style="background: ${bgColor}; padding: 8px; border: 1px solid var(--border-color); color: ${textColor}; text-align: center; font-size: 0.75rem;">${class1 === class2 ? '-' : percentage}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</table></div>';
+  container.innerHTML = html;
+}
+
+function drawFragmentation(data) {
+  const container = document.getElementById('statsBars');
+
+  if (!data || Object.keys(data).length === 0) {
+    container.innerHTML = '<div style="color: var(--text-light); padding: 1rem;">Brak danych</div>';
+    return;
+  }
+
+  const maxValue = Math.max(...Object.values(data));
+  const classColors = window.AppConfig?.classColors || {};
+
+  let html = '<div style="padding: 1rem;">';
+
+  Object.entries(data)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([cls, value]) => {
+      const color = classColors[cls] || 'rgb(128, 128, 128)';
+      const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
+      const displayValue = value.toFixed(6);
+
+      html += `
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div style="width: 16px; height: 16px; background: ${color}; border: 1px solid var(--border-color); border-radius: 2px;"></div>
+              <span style="font-size: 0.875rem; font-weight: 500;">${cls}</span>
+            </div>
+            <span style="font-size: 0.875rem; font-weight: 600;">${displayValue}</span>
+          </div>
+          <div style="width: 100%; height: 24px; background: var(--bg-light); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; background: ${color}; width: ${percentage}%; transition: width 0.6s ease;"></div>
+          </div>
+        </div>
+      `;
+    });
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
 function drawStatsBars(stats) {
   statsBars.innerHTML = "";
   if (!stats || !stats.areas_pct) {
@@ -125,43 +337,55 @@ function drawStatsBars(stats) {
     return;
   }
 
-  const colors = [
-    "#4caf50", "#2196f3", "#ff9800", "#9c27b0", "#f44336",
-    "#00bcd4", "#8bc34a", "#ffeb3b", "#795548", "#607d8b"
-  ];
+  const classColors = window.AppConfig?.classColors || {};
 
   Object.entries(stats.areas_pct)
     .sort((a, b) => b[1] - a[1])
     .forEach(([cls, pct], i) => {
       if (pct <= 0.1) return;
-      const color = colors[i % colors.length];
+      const color = classColors[cls] || "rgb(128, 128, 128)";
       const item = document.createElement("div");
       item.className = "bar-item";
       item.innerHTML = `
         <div class="bar-label">${cls}: ${pct.toFixed(1)}%</div>
-        <div class="bar" style="width:${pct}%;background:${color};"></div>
+        <div class="bar" style="width:${pct}%;background:${color};height:20px;border-radius:4px;"></div>
       `;
       statsBars.appendChild(item);
     });
 }
+
 function drawTopAreas(data) {
   const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
   const container = document.getElementById('statsBars');
   let showingAll = false;
   const showAllBtn = document.createElement('button');
-  showAllBtn.className = "show-all-btn";
+  showAllBtn.className = "image-control-btn";
   showAllBtn.textContent = "Pokaż wszystkie";
 
   function render(limit = 3) {
     container.innerHTML = "";
     const subset = showingAll ? sorted : sorted.slice(0, limit);
+    const maxValue = sorted[0][1];
+    const classColors = window.AppConfig?.classColors || {};
+
     subset.forEach(([cls, area], i) => {
-      const div = document.createElement('div');
-      div.className = "top-area-item";
-      div.innerHTML = `<span class="rank">${i + 1}.</span> ${cls}: <b>${area.toFixed(2)} km²</b>`;
-      container.appendChild(div);
+      const pct = (area / maxValue) * 100;
+      const color = classColors[cls] || "rgb(128, 128, 128)";
+      const item = document.createElement('div');
+      item.style.marginBottom = '0.75rem';
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.875rem;">
+          <span><strong>${i + 1}.</strong> ${cls}</span>
+          <span style="color: ${color}"><strong>${area.toFixed(2)} km²</strong></span>
+        </div>
+        <div style="height: 20px; width: ${pct}%; background: ${color}; border-radius: 4px; transition: width 0.5s ease;"></div>
+      `;
+      container.appendChild(item);
     });
-    if (sorted.length > limit) container.appendChild(showAllBtn);
+
+    if (sorted.length > limit) {
+      container.appendChild(showAllBtn);
+    }
   }
 
   showAllBtn.onclick = () => {
@@ -178,44 +402,45 @@ function drawTopAreas(data) {
  * fixed splitter 45/55 percent map background
  */
 export function initializeSplitter(map) {
-    const splitter = document.getElementById('splitter');
-    const root = document.documentElement;
-    const MIN_PERCENT = 25; // 25% minimum width for either pane
-    let isDragging = false;
+  const splitter = document.getElementById('splitter');
+  const root = document.documentElement;
+  const MIN_PERCENT = 25;
+  let isDragging = false;
 
-    splitter.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        document.body.classList.add('no-select');
-    });
+  splitter.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    document.body.classList.add('no-select');
+  });
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
 
-        const containerWidth = document.getElementById('main-container').offsetWidth;
-        const newMapWidthPx = e.clientX;
-        const newMapWidthPct = (newMapWidthPx / containerWidth) * 100;
-        if (newMapWidthPct < MIN_PERCENT) {
+    const containerWidth = document.getElementById('main-container').offsetWidth;
+    const newMapWidthPx = e.clientX;
+    const newMapWidthPct = (newMapWidthPx / containerWidth) * 100;
 
-            root.style.setProperty('--map-width', `${MIN_PERCENT}%`);
-            root.style.setProperty('--results-width', `${100 - MIN_PERCENT}%`);
-        } else if (newMapWidthPct > (100 - MIN_PERCENT)) {
-            root.style.setProperty('--map-width', `${100 - MIN_PERCENT}%`);
-            root.style.setProperty('--results-width', `${MIN_PERCENT}%`);
-        } else {
-            root.style.setProperty('--map-width', `${newMapWidthPct}%`);
-            root.style.setProperty('--results-width', `${100 - newMapWidthPct}%`);
-        }
+    if (newMapWidthPct < MIN_PERCENT) {
+      root.style.setProperty('--map-width', `${MIN_PERCENT}%`);
+      root.style.setProperty('--results-width', `${100 - MIN_PERCENT}%`);
+    } else if (newMapWidthPct > (100 - MIN_PERCENT)) {
+      root.style.setProperty('--map-width', `${100 - MIN_PERCENT}%`);
+      root.style.setProperty('--results-width', `${MIN_PERCENT}%`);
+    } else {
+      root.style.setProperty('--map-width', `${newMapWidthPct}%`);
+      root.style.setProperty('--results-width', `${100 - newMapWidthPct}%`);
+    }
 
-        map.invalidateSize();
-    });
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        document.body.classList.remove('no-select');
-    });
+    map.invalidateSize();
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    document.body.classList.remove('no-select');
+  });
 }
 
 export function showParamModal() {
-    paramModal.showModal();
+  paramModal.showModal();
 }
 
 /**
@@ -223,11 +448,10 @@ export function showParamModal() {
  * @param {Function} clearDrawnItems -map/main to clear the drawn layer.
  */
 export function setupModalControls(clearDrawnItems) {
-    document.getElementById('cancelBtn').onclick = () => {
-        paramModal.close();
-        clearDrawnItems();
-    };
-    // in main.js
-    document.getElementById('downloadJsonBtn').addEventListener('click', downloadStats);
-    document.getElementById('viewRawJsonBtn').addEventListener('click', viewRawStats);
+  document.getElementById('cancelBtn').onclick = () => {
+    paramModal.close();
+    clearDrawnItems();
+  };
+  document.getElementById('downloadJsonBtn').addEventListener('click', downloadStats);
+  document.getElementById('viewRawJsonBtn').addEventListener('click', viewRawStats);
 }

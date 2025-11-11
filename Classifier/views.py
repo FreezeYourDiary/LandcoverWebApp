@@ -164,8 +164,10 @@ def analyze_bbox(request):
             "analysis_id": a.id,
             "stats": stats_clean,
             "tabs": tabs,
+            "original_image": f"data:image/jpeg;base64,{original_image_b64}" if original_image_b64 else None,
             "mask_image": f"data:image/png;base64,{mask_image_b64}" if mask_image_b64 else None,
             "preview_image": f"data:image/png;base64,{blended_image_b64}" if blended_image_b64 else None,
+            "paths": {
                 "original": cropped_path,
                 "mask": mask_path,
                 "blended": blended_path
@@ -178,6 +180,7 @@ def analyze_bbox(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 def make_bbox_cache_key(bbox, model_path, params, zoom):
+    import hashlib
     import json
 
     data = {
@@ -374,6 +377,7 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
         }
 
         def get_thumb_path(original_path):
+            if not original_path:
                 return None
             base, ext = os.path.splitext(original_path)
             return f"{base}_thumb.jpg"
@@ -587,11 +591,14 @@ def analyze_wojewodztwo(request):
             f"{wojewodztwo_slug}_zoom{zoom}_cropped_mask.png"
         )
 
+        if os.path.exists(base_cropped_path) and os.path.exists(base_mask_path):
             print(f"[INFO] cropp debug stitched missing {zoom}")
             cropped_path = base_cropped_path
             cropped_mask = cv2.imread(base_mask_path, cv2.IMREAD_GRAYSCALE)
 
+            stitched_path = cropped_path.replace("_cropped.jpg", "_stitched.jpg")
             if not os.path.exists(stitched_path):
+                print(f"[INFO]+ stitched")
                 conn = sqlite3.connect(mbtiles_path)
                 cur = conn.cursor()
                 cur.execute("SELECT MAX(zoom_level) FROM tiles")
@@ -653,6 +660,7 @@ def analyze_wojewodztwo(request):
                 actual_zoom
             )
 
+            cropped_path, cropped_mask, crop_offset = crop_image_by_mask(
                 stitched_path, mask, base_cropped_path
             )
 

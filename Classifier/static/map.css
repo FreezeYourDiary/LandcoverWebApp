@@ -64,6 +64,47 @@ html, body {
 .leaflet-pane.leaflet-labels-pane {
   pointer-events: none;
 }
+.download-overlay-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  opacity: 0.9;
+  font-size: 0.875rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--bg-light);
+  cursor: pointer;
+  user-select: none;
+}
+
+.download-overlay-btn.image-control-btn {
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  transition: none;
+}
+.download-overlay-btn.image-control-btn:hover {
+  background: var(--bg-light);
+}
+.json-action-btn {
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: none;
+}
+
+.json-action-btn:hover,
+.json-action-btn:focus,
+.json-action-btn:active {
+  background: var(--bg-light);
+  outline: none;
+  box-shadow: none;
+}
+
 
 #preview {
   max-width: 100%;
@@ -117,15 +158,6 @@ dialog::backdrop {
   background: #ccc;
   border: 1px solid #bbb;
 }
-#runAnalyzeBtn {
-  background: #007bff;
-  color: white;
-  border: 1px solid #007bff;
-}
-#runAnalyzeBtn:hover {
-  background: #0056b3;
-  border-color: #0056b3;
-}
 
 #progressPanel {
   margin-top: 15px;
@@ -174,16 +206,16 @@ dialog::backdrop {
   margin-bottom: 2px;
 }
 
-#downloadJsonBtn, #viewRawJsonBtn {
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  background: #565c63;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-  border: none;
-}
+/*#downloadJsonBtn, #viewRawJsonBtn {*/
+/*  margin-bottom: 8px;*/
+/*  padding: 6px 10px;*/
+/*  background: #565c63;*/
+/*  color: white;*/
+/*  border-radius: 4px;*/
+/*  cursor: pointer;*/
+/*  font-size: 0.85em;*/
+/*  border: none;*/
+/*}*/
 #downloadJsonBtn:hover, #viewRawJsonBtn:hover {
   background: #125ea5;
   border: none;

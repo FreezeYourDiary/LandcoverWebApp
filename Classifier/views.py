@@ -134,30 +134,34 @@ def analyze_bbox(request):
         tabs = [
             {
                 "key": "area",
-                "label": "Area (km²)",
+                "label": "Powierzchnia (km²)",
                 "data": stats_clean.get("areas_sq_km", {})
             },
             {
                 "key": "percentage",
-                "label": "Area (%)",
+                "label": "Powierzchnia (%)",
                 "data": stats_clean.get("areas_pct", {})
             },
             {
                 "key": "density",
-                "label": "Density",
+                "label": "Gęstość zabudowy",
                 "data": stats_clean.get("density", 0)  # density not density_default
             },
             {
                 "key": "fragmentation",
-                "label": "Fragmentation",
+                "label": "Indeks fragmentacji",
                 "data": stats_clean.get("fragmentation", {})
             },
             {
                 "key": "adjacency",
-                "label": "Adjacency Matrix",
+                "label": "Macierz sąsiedztwa",
                 "data": stats_clean.get("adjacency", {})
             }
         ]
+
+        residential_image_b64 = outputs.get("residential_image")
+
+        print(f"[views] Residential outputs; {residential_image_b64 is not None}")
 
         return JsonResponse({
             "cached": False,
@@ -167,6 +171,7 @@ def analyze_bbox(request):
             "original_image": f"data:image/jpeg;base64,{original_image_b64}" if original_image_b64 else None,
             "mask_image": f"data:image/png;base64,{mask_image_b64}" if mask_image_b64 else None,
             "preview_image": f"data:image/png;base64,{blended_image_b64}" if blended_image_b64 else None,
+            "residential_image": residential_image_b64,  # NEW
             "paths": {
                 "original": cropped_path,
                 "mask": mask_path,
@@ -287,11 +292,7 @@ def wojewodztwa_list_view(request):
         'title': 'Województwa Analysis'
     })
 
-
 def wojewodztwo_detail_view(request, wojewodztwo_id):
-    """
-    Template: wojewodztwo_detail.html
-    """
     geojson_path = os.path.join(
         settings.BASE_DIR,
         "Classifier/static/geodata/wojewodztwa-max.geojson"
@@ -314,6 +315,9 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
         analysis = all_analyses.first()
 
     poland_averages = None
+
+
+
     if analysis:
         all_woj_analyses = WojewodztwoAnalysis.objects.all()
         if all_woj_analyses.exists():
@@ -359,21 +363,22 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
     if analysis:
         stats = analysis.stats
         tabs = [
-            {"key": "area", "label": "Area (km²)", "data": stats.get("areas_sq_km", {})},
-            {"key": "percentage", "label": "Area (%)", "data": stats.get("areas_pct", {})},
-            {"key": "density", "label": "Density", "data": stats.get("density")},
-            {"key": "adjacency", "label": "Adjacency Matrix", "data": stats.get("adjacency", {})},
-            {"key": "fragmentation", "label": "Fragmentation", "data": stats.get("fragmentation", {})}
+            {"key": "area", "label": "Powierzchnia (km²)", "data": stats.get("areas_sq_km", {})},
+            {"key": "percentage", "label": "Powierzchnia (%)", "data": stats.get("areas_pct", {})},
+            {"key": "density", "label": "Gęstość", "data": stats.get("density")},
+            {"key": "adjacency", "label": "Macierz sąsiedztwa", "data": stats.get("adjacency", {})},
+            {"key": "fragmentation", "label": "Indeks fragmentacji", "data": stats.get("fragmentation", {})}
         ]
 
         config = analysis.config or {}
+        model_name = os.path.basename(analysis.model_path).replace('.keras', '')
         wojewodztwo_stats = {
-            'Total Area': f"{analysis.total_area_km2:.2f} km²" if analysis.total_area_km2 else "N/A",
-            'Analysis Date': analysis.created_at.strftime("%Y-%m-%d %H:%M"),
-            'Model': os.path.basename(analysis.model_path),
-            'Mode': config.get('ANALYSIS_MODE', 'N/A'),
-            'Tile Size': f"{config.get('TILE_SIZE', 'auto')}px",
-            'Zoom Level': str(analysis.zoom),
+            'Całkowita powierzchnia': f"{analysis.total_area_km2:.2f} km²" if analysis.total_area_km2 else "N/A",
+            'Data analizy': analysis.created_at.strftime("%Y-%m-%d %H:%M"),
+            'Model': model_name,
+            'Tryb analizy': config.get('ANALYSIS_MODE', 'N/A'),
+            'Rozmiar kafelka': f"{config.get('TILE_SIZE', 'auto')}px",
+            'Poziom powiększenia': str(analysis.zoom),
         }
 
         def get_thumb_path(original_path):
@@ -414,10 +419,16 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
             except Exception as e:
                 boundary_image_path = analysis.cropped_image_path
 
-        image_data = {}
+        image_data = {
+            'has_original': False,
+            'has_mask': False,
+            'has_blended': False,
+        }
+
         display_image = boundary_image_path or analysis.cropped_image_path
 
         if display_image and os.path.exists(display_image):
+            image_data['has_original'] = True
             thumb_path = ensure_thumbnail(display_image)
 
             if thumb_path and os.path.exists(thumb_path):
@@ -426,19 +437,10 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
                         thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
                         image_data['original_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
                 except Exception as e:
-                    print(f"[ERROR] no thumb to read thumb: {e}")
+                    print(f"[ERROR] Failed to read thumb: {e}")
 
-            rel_path = os.path.relpath(display_image, settings.MEDIA_ROOT)
-            image_data['original_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
-
-            if analysis.cropped_image_path:
-                rel_path_orig = os.path.relpath(analysis.cropped_image_path, settings.MEDIA_ROOT)
-                image_data['original_download'] = f"{settings.MEDIA_URL}{rel_path_orig}".replace('\\', '/')
-
-            print(f"[DEBUG] original: {image_data['original_url']}")
-
-        print(f"\n[DEBUG] process mask mask: {analysis.mask_path}")
         if analysis.mask_path and os.path.exists(analysis.mask_path):
+            image_data['has_mask'] = True
             thumb_path = ensure_thumbnail(analysis.mask_path)
 
             if thumb_path and os.path.exists(thumb_path):
@@ -447,16 +449,10 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
                         thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
                         image_data['mask_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
                 except Exception as e:
-                    print(f"[ERROR] no thumb to read thumb: {e}")
+                    print(f"[ERROR] Failed to read mask thumb: {e}")
 
-            rel_path = os.path.relpath(analysis.mask_path, settings.MEDIA_ROOT)
-            image_data['mask_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
-            image_data['mask_download'] = image_data['mask_url']  # Same for download
-            print(f"[DEBUG] Mask URL: {image_data['mask_url']}")
-
-        # Blended image
-        print(f"\n[DEBUG] process blended: {analysis.fig_path}")
         if analysis.fig_path and os.path.exists(analysis.fig_path):
+            image_data['has_blended'] = True
             thumb_path = ensure_thumbnail(analysis.fig_path)
 
             if thumb_path and os.path.exists(thumb_path):
@@ -465,14 +461,9 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
                         thumb_b64 = base64.b64encode(f.read()).decode("utf-8")
                         image_data['blended_thumb'] = f"data:image/jpeg;base64,{thumb_b64}"
                 except Exception as e:
-                    print(f"[ERROR] Failed to read thumb: {e}")
+                    print(f"[ERROR] Failed to read blended thumb: {e}")
 
-            rel_path = os.path.relpath(analysis.fig_path, settings.MEDIA_ROOT)
-            image_data['blended_url'] = f"{settings.MEDIA_URL}{rel_path}".replace('\\', '/')
-            image_data['blended_download'] = image_data['blended_url']  # Same for download
-            print(f"[DEBUG] Blended URL: {image_data['blended_url']}")
-
-        print(f"\n[DEBUG] Final image_data keys: {image_data.keys()}")
+        print(f"[DEBUG] image_data keys: {image_data.keys()}")
 
         context.update({
             'analysis': analysis,
@@ -485,21 +476,33 @@ def wojewodztwo_detail_view(request, wojewodztwo_id):
     return render(request, 'wojewodztwo_detail.html', context)
 
 
-def calculate_poland_averages(analyses):
+def calculate_poland_averages(all_analyses):
+    latest_per_wojewodztwo = {}
+
+    for analysis in all_analyses:
+        woj_id = analysis.wojewodztwo_id
+
+        if woj_id not in latest_per_wojewodztwo:
+            latest_per_wojewodztwo[woj_id] = analysis
+        else:
+            if analysis.created_at > latest_per_wojewodztwo[woj_id].created_at:
+                latest_per_wojewodztwo[woj_id] = analysis
+
     total_stats = {
         "areas_pct": {},
         "fragmentation": {}
     }
     density_sum = 0
     density_count = 0
-
     count = 0
-    for analysis in analyses:
+
+    for analysis in latest_per_wojewodztwo.values():
         stats = analysis.stats
         if not stats:
             continue
 
         count += 1
+
         for class_name, value in stats.get("areas_pct", {}).items():
             if class_name not in total_stats["areas_pct"]:
                 total_stats["areas_pct"][class_name] = 0
@@ -517,6 +520,7 @@ def calculate_poland_averages(analyses):
 
     if count == 0:
         return None
+
     averages = {
         "areas_pct": {k: v / count for k, v in total_stats["areas_pct"].items()},
         "fragmentation": {k: v / count for k, v in total_stats["fragmentation"].items()},
@@ -524,7 +528,6 @@ def calculate_poland_averages(analyses):
     }
 
     return averages
-
 
 @csrf_exempt
 def analyze_wojewodztwo(request):
@@ -581,7 +584,6 @@ def analyze_wojewodztwo(request):
         )
         os.makedirs(output_base, exist_ok=True)
 
-        # FIXED: Check for existing base cropped image (zoom-specific)
         base_cropped_path = os.path.join(
             output_base,
             f"{wojewodztwo_slug}_zoom{zoom}_cropped.jpg"
@@ -717,7 +719,6 @@ def analyze_wojewodztwo(request):
         traceback.print_exc()
         return JsonResponse({"error": str(e)}, status=500)
 
-
 def wojewodztwo_tiles(request, wojewodztwo_id, z, x, y):
     """
     provide
@@ -778,65 +779,163 @@ def api_list_wojewodztwa(request):
 
     return JsonResponse({'wojewodztwa': result})
 
+def download_wojewodztwo_image(request, analysis_id, image_type):
+    """
+    Download images from wojewodztwo analysis
+    image_type: original, mask, blended
+    """
+    try:
+        analysis = WojewodztwoAnalysis.objects.get(id=analysis_id)
+
+        file_path_map = {
+            'original': analysis.cropped_image_path,
+            'mask': analysis.mask_path,
+            'blended': analysis.fig_path,
+        }
+
+        file_path = file_path_map.get(image_type)
+
+        if not file_path or not os.path.exists(file_path):
+            return HttpResponse("File not found", status=404)
+
+        allowed_dirs = [
+            os.path.join(settings.MEDIA_ROOT, 'Classifier/outputs'),
+            os.path.join(settings.BASE_DIR, 'Classifier/outputs'),
+        ]
+
+        file_abs = os.path.abspath(file_path)
+        if not any(file_abs.startswith(os.path.abspath(d)) for d in allowed_dirs):
+            return HttpResponse("Access denied", status=403)
+
+        return FileResponse(open(file_path, 'rb'),
+                            as_attachment=True,
+                            filename=os.path.basename(file_path))
+
+    except WojewodztwoAnalysis.DoesNotExist:
+        return HttpResponse("Analysis not found", status=404)
+
 def history(request):
     """
-    history
+    History of analyses
     """
+    import os
+    from django.core.paginator import Paginator
     from Classifier.models import Analysis, WojewodztwoAnalysis
-    bbox_analyses = Analysis.objects.all().order_by('-created_at')
-    woj_analyses = WojewodztwoAnalysis.objects.all().order_by('-created_at')
+
+    CLASS_NAMES_PL = {
+        "AnnualCrop": "Uprawy jednoroczne",
+        "Forest": "Las",
+        "HerbaceousVegetation": "Roślinność zielna",
+        "Highway": "Drogi",
+        "Industrial": "Tereny przemysłowe",
+        "Pasture": "Pastwiska",
+        "PermanentCrop": "Uprawy wieloletnie",
+        "Residential": "Tereny mieszkalne",
+        "River": "Rzeki",
+        "SeaLake": "Jeziora i morza",
+    }
+
+    def translate_stats(stats):
+        """Translate stats['areas_pct'] keys to Polish."""
+        if not stats or "areas_pct" not in stats:
+            return stats
+
+        translated = stats.copy()
+        translated["areas_pct"] = {
+            CLASS_NAMES_PL.get(k, k): v
+            for k, v in stats["areas_pct"].items()
+        }
+        return translated
+
+    bbox_analyses = Analysis.objects.all().order_by("-created_at")
+    woj_analyses = WojewodztwoAnalysis.objects.all().order_by("-created_at")
 
     analyses_data = []
 
-    for analysis in bbox_analyses:
+    for a in bbox_analyses:
         files_available = {
-            'stats_json': analysis.stats_json and os.path.exists(analysis.stats_json),
-            'metadata_json': analysis.metadata_json and os.path.exists(analysis.metadata_json),
-            'fig': analysis.fig_path and os.path.exists(analysis.fig_path),
-            'mask': analysis.mask_path and os.path.exists(analysis.mask_path),
+            "stats_json": a.stats_json and os.path.exists(a.stats_json),
+            "metadata_json": a.metadata_json and os.path.exists(a.metadata_json),
+            "fig": a.fig_path and os.path.exists(a.fig_path),
+            "mask": a.mask_path and os.path.exists(a.mask_path),
+        }
+        stats_translated = translate_stats(a.stats or {})
+        short_desc = generate_short_desc(stats_translated.get("areas_pct", {}))
+
+        analyses_data.append({
+            "type": "bbox",
+            "id": a.id,
+            "timestamp": a.created_at,
+            "stats": stats_translated,
+            "preview_path": a.fig_path or a.mask_path,
+            "model": os.path.basename(a.model_path) if a.model_path else "Unknown",
+            "files": files_available,
+            "short_desc": short_desc,
+        })
+
+    for a in woj_analyses:
+        files_available = {
+            "stats_json": a.stats_json and os.path.exists(a.stats_json),
+            "metadata_json": a.metadata_json and os.path.exists(a.metadata_json),
+            "fig": a.fig_path and os.path.exists(a.fig_path),
+            "mask": a.mask_path and os.path.exists(a.mask_path),
         }
 
         analyses_data.append({
-            'type': 'bbox',
-            'id': analysis.id,
-            'timestamp': analysis.created_at,
-            'stats': analysis.stats or {},
-            'preview_path': analysis.fig_path or analysis.mask_path,  # Store path, not base64
-            'model': os.path.basename(analysis.model_path) if analysis.model_path else 'Unknown',
-            'files': files_available,
+            "type": "wojewodztwo",
+            "id": a.id,
+            "wojewodztwo_name": a.wojewodztwo_name,
+            "timestamp": a.created_at,
+            "stats": translate_stats(a.stats or {}),
+            "preview_path": a.fig_path or a.mask_path,
+            "model": os.path.basename(a.model_path) if a.model_path else "Unknown",
+            "total_area_km2": a.total_area_km2,
+            "files": files_available,
+            "short_desc": a.short_desc if hasattr(a, "short_desc") else "",  # NEW
         })
 
-    for analysis in woj_analyses:
-        files_available = {
-            'stats_json': analysis.stats_json and os.path.exists(analysis.stats_json),
-            'metadata_json': analysis.metadata_json and os.path.exists(analysis.metadata_json),
-            'fig': analysis.fig_path and os.path.exists(analysis.fig_path),
-            'mask': analysis.mask_path and os.path.exists(analysis.mask_path),
-        }
-
-        analyses_data.append({
-            'type': 'wojewodztwo',
-            'id': analysis.id,
-            'wojewodztwo_name': analysis.wojewodztwo_name,
-            'timestamp': analysis.created_at,
-            'stats': analysis.stats or {},
-            'preview_path': analysis.fig_path or analysis.mask_path,  # Store path, not base64
-            'model': os.path.basename(analysis.model_path) if analysis.model_path else 'Unknown',
-            'total_area_km2': analysis.total_area_km2,
-            'files': files_available,
-        })
-
-    analyses_data.sort(key=lambda x: x['timestamp'], reverse=True)
     # updated. znaczniki paginatory to lepszej load strony
+    analyses_data.sort(key=lambda x: x["timestamp"], reverse=True)
+
     paginator = Paginator(analyses_data, 21)
-    page_number = request.GET.get('page', 1)
+    page_number = request.GET.get("page", 1)
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'history.html', {
-        'page_obj': page_obj,
-        'total_count': len(analyses_data),
-        'title': 'All Analyses'
+    return render(request, "history.html", {
+        "page_obj": page_obj,
+        "total_count": len(analyses_data),
+        "title": "Historia analiz",
     })
+
+def generate_short_desc(areas_pct):
+    """
+    Tworzy automatyczny krótki opis na podstawie procentowego udziału klas.
+    - >40% → dominują
+    - 5-40% → występują
+    - <5% → pomijamy
+    """
+    if not areas_pct:
+        return ""
+
+    dominant = []
+    present = []
+
+    for cls, pct in areas_pct.items():
+        if pct > 40:
+            dominant.append(cls)
+        elif pct > 5:
+            present.append(cls)
+
+    parts = []
+    if dominant:
+        parts.append(f"dominują: {', '.join(dominant)}")
+    if present:
+        parts.append(f"występują: {', '.join(present)}")
+
+    if not parts:
+        return "Brak wyraźnie zaznaczonych klas pokrycia terenu."
+
+    return f"W wyniku analizy otrzymano teren, gdzie {', '.join(parts)}."
 
 
 def get_analysis_preview(request, analysis_type, analysis_id):
@@ -867,7 +966,6 @@ def get_analysis_preview(request, analysis_type, analysis_id):
 
     except (Analysis.DoesNotExist, WojewodztwoAnalysis.DoesNotExist):
         return HttpResponse("Analysis not found", status=404)
-
 
 def download_analysis_file(request, analysis_type, analysis_id, file_type):
     """

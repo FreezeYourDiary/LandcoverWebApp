@@ -17,9 +17,14 @@ export async function runAnalysis(rectBounds, zoom) {
   const modelPath = document.getElementById('modelSelect')?.value;
   const analysisMode = document.getElementById('analysisMode')?.value;
   const applySmoothing = document.getElementById('smoothing')?.checked;
+  const applyInterpolation = document.getElementById('interpolation')?.checked;  // NEW
+  const useSimplified = document.getElementById('simplifiedClasses')?.checked;  // NEW
   const fixSeaLake = document.getElementById('fixSeaLake')?.checked;
 
-  console.log('[DEBUG] Params:', { modelPath, analysisMode, applySmoothing, fixSeaLake });
+  console.log('[DEBUG] Params:', {
+    modelPath, analysisMode, applySmoothing,
+    applyInterpolation, useSimplified, fixSeaLake
+  });
 
   const bbox = [
     rectBounds.getSouthWest().lng,
@@ -37,6 +42,8 @@ export async function runAnalysis(rectBounds, zoom) {
     params: {
       ANALYSIS_MODE: analysisMode,
       APPLY_SMOOTHING: applySmoothing,
+      APPLY_INTERPOLATION: applyInterpolation,
+      USE_SIMPLIFIED_CLASSES: useSimplified,
       FIX_SEALAKE: fixSeaLake
     }
   };

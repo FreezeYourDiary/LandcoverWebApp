@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const statsBars = document.getElementById('statsBars');
-            statsBars.innerHTML = '<div style="text-align:center; padding: 20px;">Processing...</div>';
+            statsBars.innerHTML = '<div style="text-align:center; padding: 20px;">Analiza w toku...</div>';
 
             try {
                 await runAnalysis(lastRectBounds, map.getZoom());

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from keras.src.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.preprocessing.image import img_to_array
-
+from Classifier.src.utils.interpolation import apply_interpolation, simplify_predictions
 
 def pad_incomplete_patch(patch, target_size, method='reflect'):
     """
@@ -226,12 +226,14 @@ def classify_image_with_mask(image_path, model, img_size, tile_size, class_names
 
     coarse_grid = None
     coarse_probs = None
-    if hierarchical_weight > 0.0 and tile_size == 32:
-        print(f"[DEBUG] coarse context run")
-        coarse_grid, coarse_conf, coarse_probs = get_coarse_context_with_mask(
-            original, model, mask, img_size, tile_size=64,
-            class_names=class_names, class_priorities=class_priorities
-        )
+    if hierarchical_weight > 0.0 and coarse_probs is not None:
+        coarse_y = y // 64
+        coarse_x = x // 64
+
+        coarse_y = min(coarse_y, coarse_probs.shape[0] - 1)
+        coarse_x = min(coarse_x, coarse_probs.shape[1] - 1)
+
+        coarse_pred = coarse_probs[coarse_y, coarse_x]
 
     tiles_y = (h + tile_size - 1) // tile_size
     tiles_x = (w + tile_size - 1) // tile_size
@@ -352,4 +354,155 @@ def classify_image_with_mask(image_path, model, img_size, tile_size, class_names
         "original": original,
         "metadata": metadata,
         "sealake_changes": sealake_changes
+    }
+
+
+def classify_image_with_interpolation(
+        image_path,
+        model,
+        img_size=64,
+        tile_size=64,
+        class_names=None,
+        mask=None,
+        use_interpolation=False,
+        use_simplified=False,
+        class_mapping=None,
+        hierarchical_weight=0.0,
+        class_priorities=None
+):
+    from Classifier.src.utils.interpolation import apply_interpolation, simplify_predictions
+
+    print(f"[DEBUG] Loading image: {image_path}")
+    original = cv2.imread(image_path)
+    if original is None:
+        raise FileNotFoundError(f"Cannot read image: {image_path}")
+
+    h, w, _ = original.shape
+    print(f"[INFO] Image size: {w}x{h}")
+    print(f"[INFO] Interpolation: {use_interpolation}, Simplified: {use_simplified}")
+
+    coarse_probs = None
+    coarse_grid = None
+    if hierarchical_weight > 0.0 and tile_size == 32:
+        print(f"[INFO] Generating 64x64")
+        coarse_grid, coarse_conf, coarse_probs = get_coarse_context_with_mask(
+            original, model, mask, img_size, tile_size=64,
+            class_names=class_names, class_priorities=class_priorities
+        )
+
+    tiles_y = (h + tile_size - 1) // tile_size
+    tiles_x = (w + tile_size - 1) // tile_size
+    num_classes = len(class_names)
+    low_res_prob_grid = np.zeros((tiles_y, tiles_x, num_classes), dtype=float)
+
+    print(f"[INFO] Running {tile_size}x{tile_size} tile predictions...")
+
+    processed_tiles = 0
+    skipped_tiles = 0
+
+    for yi, y in enumerate(range(0, h, tile_size)):
+        for xi, x in enumerate(range(0, w, tile_size)):
+            y_end = min(y + tile_size, h)
+            x_end = min(x + tile_size, w)
+            patch = original[y:y_end, x:x_end]
+
+            if patch.shape[0] == 0 or patch.shape[1] == 0:
+                continue
+
+            if mask is not None:
+                mask_patch = mask[y:y_end, x:x_end]
+                if check_masked(patch, mask_patch, threshold=0.3):
+                    skipped_tiles += 1
+                    continue
+
+            if patch.shape[0] < tile_size or patch.shape[1] < tile_size:
+                patch = pad_incomplete_patch(patch, (tile_size, tile_size), method='reflect')
+
+            arr = preprocess_patch(patch, img_size)
+            fine_pred = model.predict(arr, verbose=0)[0]
+
+            if class_priorities:
+                fine_pred = apply_class_priorities(fine_pred, class_priorities, class_names)
+
+            if hierarchical_weight > 0.0 and coarse_probs is not None and coarse_grid is not None:
+                _, coarse_pred = get_coarse_context_at_position(
+                    coarse_grid, coarse_probs, y, x, tile_size, coarse_tile_size=64
+                )
+                combined_pred = fine_pred * (1 - hierarchical_weight) + coarse_pred * hierarchical_weight
+                combined_pred /= np.sum(combined_pred)  # Re-normalize
+            else:
+                combined_pred = fine_pred
+
+            low_res_prob_grid[yi, xi] = combined_pred
+            processed_tiles += 1
+
+    print(f"[INFO] Processed: {processed_tiles}, Skipped: {skipped_tiles}")
+
+    if use_interpolation:
+        print("[INFO] interp handle")
+        full_res_probs = apply_interpolation(low_res_prob_grid, w, h)
+    else:
+        print("[INFO] no interp handle")
+        full_res_probs = np.repeat(np.repeat(low_res_prob_grid, tile_size, axis=0), tile_size, axis=1)
+        full_res_probs = full_res_probs[:h, :w, :]
+
+    active_class_names = class_names
+    if use_simplified and class_mapping:
+        print("[INFO] Converting to simplified classes...")
+        full_res_probs, active_class_names = simplify_predictions(
+            full_res_probs, class_names, class_mapping
+        )
+        print(f"[INFO] Active classes after simplification: {active_class_names}")
+
+    # per-pixel -ihicies)
+    final_class_indices = np.argmax(full_res_probs, axis=-1)
+    final_confidence_map = np.max(full_res_probs, axis=-1)
+
+    pred_grid = final_class_indices[::tile_size, ::tile_size]
+    conf_grid = final_confidence_map[::tile_size, ::tile_size]
+
+    if pred_grid.shape != (tiles_y, tiles_x):
+        pred_grid = np.zeros((tiles_y, tiles_x), dtype=int)
+        conf_grid = np.zeros((tiles_y, tiles_x), dtype=float)
+        for yi in range(tiles_y):
+            for xi in range(tiles_x):
+                y_sample = min(yi * tile_size, h - 1)
+                x_sample = min(xi * tile_size, w - 1)
+                pred_grid[yi, xi] = final_class_indices[y_sample, x_sample]
+                conf_grid[yi, xi] = final_confidence_map[y_sample, x_sample]
+
+    mean_conf_per_class = {}
+    for i, cls_name in enumerate(active_class_names):
+        class_mask = final_class_indices == i
+        class_conf = final_confidence_map[class_mask]
+        mean_conf_per_class[cls_name] = float(np.mean(class_conf)) if class_conf.size > 0 else 0.0
+
+    metadata = {
+        "image_size": {"width": w, "height": h},
+        "tile_size": tile_size,
+        "tiles_x": int(tiles_x),
+        "tiles_y": int(tiles_y),
+        "total_tiles": int(tiles_y * tiles_x),
+        "processed_tiles": int(processed_tiles),
+        "skipped_tiles": int(skipped_tiles),
+        "mean_confidence": float(np.mean(final_confidence_map)),
+        "mean_confidence_per_class": mean_conf_per_class,
+        "use_interpolation": use_interpolation,
+        "use_simplified": use_simplified,
+        "hierarchical_weight": hierarchical_weight,
+        "class_priorities": class_priorities,
+        "active_classes": active_class_names
+    }
+
+    return {
+        "pred_grid": pred_grid,
+        "conf_grid": conf_grid,
+        "pred_probs": full_res_probs.reshape(-1, len(active_class_names)),
+        "raw_probs_grid": full_res_probs,
+        "original": original,
+        "metadata": metadata,
+        "sealake_changes": [],
+        "full_res_class_indices": final_class_indices,
+        "full_res_confidence": final_confidence_map,
+        "active_class_names": active_class_names
     }

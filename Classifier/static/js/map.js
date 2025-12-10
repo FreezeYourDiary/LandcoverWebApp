@@ -53,8 +53,8 @@ export function initMap() {
   });
   map.addControl(drawControl);
 
-  const baseLayers = { "Satellite Imagery": satelliteLayer };
-  const overlays = { "City Names": labelOverlay };
+  const baseLayers = { "Powierzchnia satelitarna": satelliteLayer };
+  const overlays = { "Miasta": labelOverlay };
   L.control.layers(baseLayers, overlays).addTo(map);
 
   return { map, drawnItems };

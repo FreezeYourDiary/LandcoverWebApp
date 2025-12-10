@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Województwa Analysis{% endblock %}
+{% block title %}Wybierz województwo do analizy{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'app.css' %}">
@@ -57,7 +57,7 @@
     <label for="modelSelect">Wybierz model:</label>
     <select id="modelSelect">
       <option value="Classifier/inputs/networks/mobilenetv2_v1.keras">MobileNetV2 v1 (Zalecany)</option>
-      <option value="Classifier/inputs/networks/mobilenetv2_v3.keras">MobileNetV2 v3</option>
+      <option value="Classifier/inputs/networks/mobilenetv2_2.keras">MobileNetV2 v3</option>
       <option value="Classifier/inputs/networks/dummy_future.keras">Dummy Model (Testing)</option>
     </select>
     <p class="config-help">Wybierz wytrenowany model klasyfikacji</p>
@@ -66,12 +66,12 @@
   <div class="config-group">
     <label for="analysisMode">Poziom analizy:</label>
     <select id="analysisMode">
-      <option value="detailed" selected>Szczegółowy (32x32 hierarchiczny) - Zalecany</option>
-      <option value="fast">Szybki (64x64) - Szybszy ale mniej dokładny</option>
+      <option value="detailed" selected>Szczegółowy (Zalecany)</option>
+      <option value="fast">Szybki (Szybszy ale mniej dokładny)</option>
     </select>
     <p class="config-help">
-      <strong>Szczegółowy:</strong> 32x32 kafle z kontekstem 64x64 (waga 0.55), priorytetami klas i naprawą SeaLake<br>
-      <strong>Szybki:</strong> 64x64 kafle z priorytetami klas
+      <strong>Szczegółowy:</strong> 32x32 wycinki z kontekstem 64x64 (waga 0.55), priorytetami klas i naprawą SeaLake<br>
+      <strong>Szybki:</strong> 64x64 wycinki z priorytetami klas
     </p>
   </div>
 

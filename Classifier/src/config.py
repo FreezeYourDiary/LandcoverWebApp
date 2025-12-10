@@ -4,6 +4,8 @@ DEFAULT_CONFIG = {
     "TILE_SIZE": 32,
     "CONF_THRESH": 0.6,
     "APPLY_SMOOTHING": True,
+    "APPLY_INTERPOLATION": False,  # +
+    "USE_SIMPLIFIED_CLASSES": False,  # +
     "NEIGHBORHOOD": 3,
     "OUTPUT_BASE_DIR": "outputs/results",
     "MAP_PATH": "data/raw/satellite-2017-11-02_europe_poland.mbtiles"
@@ -14,6 +16,25 @@ CLASS_NAMES = [
     "Highway", "Industrial", "Pasture",
     "PermanentCrop", "Residential", "River", "SeaLake"
 ]
+
+SIMPLIFIED_CLASS_NAMES = [
+    "AnnualCrop", "Forest", "HerbaceousVegetation",
+    "Pasture", "PermanentCrop", "Residential", "River", "SeaLake"
+]
+
+CLASS_MAPPING = {
+    "AnnualCrop": "AnnualCrop",
+    "Forest": "Forest",
+    "HerbaceousVegetation": "Forest",  #+forest
+    "Highway": None,
+    "Industrial": None,
+    "Pasture": "Pasture",
+    "PermanentCrop": "PermanentCrop",
+    "Residential": "Residential",
+    "River": "River",
+    "SeaLake": "SeaLake"
+}
+
 COLORS = {
     "AnnualCrop": (255, 255, 0),
     "Forest": (0, 255, 0),

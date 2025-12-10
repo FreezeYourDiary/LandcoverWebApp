@@ -133,6 +133,11 @@ min-width: 120px;
 padding: 0.5rem;
 font-size: 0.875rem;
 }
+.analysis-shortdesc {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
 
 /* Pagination styles */
 .pagination {

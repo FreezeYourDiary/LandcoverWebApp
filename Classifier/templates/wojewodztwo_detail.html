@@ -7,15 +7,13 @@
     <link rel="stylesheet" href="{% static 'app.css' %}">
     <link rel="stylesheet" href="{% static 'map.css' %}">
     <link rel="stylesheet" href="{% static 'details.css' %}">
+        <link rel="stylesheet" href="{% static 'history.css' %}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.css">
 {% endblock extra_css %}
 
 {% block content %}
     <div id="main-container">
-        <!-- stats 75% -->
         <div id="results-pane" style="width: var(--results-width); ">
-            <a href="{% url 'wojewodztwa_list' %}" class="btn-secondary"
-               style="display: inline-block; margin-bottom: 1rem;"> ← Powrót </a>
 
             <div style="text-align: center; margin-bottom: 2rem;">
                 <h1>{{ wojewodztwo.display_name }}</h1>
@@ -26,14 +24,12 @@
             </div>
 
             {% if has_analysis %}
-                <!-- Stats cards -->
                 {% if analyses_count > 1 %}
                     <div class="analysis-selector">
                         <label for="analysisSelect" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">
                             Wybierz analizę ({{ analyses_count }} dostępnych):
                         </label>
                         <select id="analysisSelect" onchange="window.location.href='?analysis_id=' + this.value">
-                            <!-- javascript html -->
                         </select>
                         <div class="analysis-info" id="analysisInfo"></div>
                     </div>
@@ -54,17 +50,17 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                         <h3 style="margin: 0;">Statystyki</h3>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button id="viewRawBtn" title="View Raw JSON" style="padding: 0.5rem; font-size: 1.2rem;">
+                            <button id="viewRawBtn" class="btn-small" title="View Raw JSON" style="padding: 0.5rem; font-size: 1.2rem;">
                                 Raw
                             </button>
-                            <button id="downloadBtn" title="Download JSON" style="padding: 0.5rem; font-size: 1.2rem;">
+                            <button id="downloadBtn" class="btn-small" title="Download JSON" style="padding: 0.5rem; font-size: 1.2rem;">
                                 🢃
                             </button>
                         </div>
                     </div>
 
                     <div id="tabsHeader"></div>
-                    <div style="max-height: 600px; overflow-y: auto;">
+                    <div style="max-height: 1000px; overflow-y: auto;">
                         <canvas id="statsChart"></canvas>
                         <div id="statsTable"></div>
                     </div>
@@ -77,7 +73,7 @@
                         <p style="color: var(--text-light); margin-bottom: 1.5rem;">
                             Odpal analizę by zobaczyć statystyki
                         </p>
-                        <button class="btn-primary" onclick="window.location.href='{% url 'wojewodztwa_list' %}'">
+                        <button class="btn-primary btn-small" onclick="window.location.href='{% url 'wojewodztwa_list' %}'">
                             Wróć [strona analizy]
                         </button>
                     </div>
@@ -91,13 +87,13 @@
             {% if has_analysis %}
                 <div class="card" style="height: 100%;">
                     <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
-                        <button class="image-control-btn active" data-view="original" data-download-name="original.jpg">
-                            Original
+                        <button class="image-control-btn active" data-view="original">
+                            Oryginał
                         </button>
-                        <button class="image-control-btn" data-view="mask" data-download-name="mask.png">Mask</button>
-                        <button class="image-control-btn" data-view="blended" data-download-name="overlay.png">Overlay
+                        <button class="image-control-btn btn-small" data-view="mask">Maska</button>
+                        <button class="image-control-btn btn-small" data-view="blended">Overlay
                         </button>
-                        <button id="downloadCurrentBtn" class="image-control-btn">
+                        <button id="downloadCurrentBtn btn-small" class="image-control-btn">
                                 🢃
                         </button>
                     </div>
@@ -138,26 +134,27 @@
                                  style="max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.3s;">
                         </div>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <h3 style="margin: 0;">Województwo</h3>
+                    <div style="display: center; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
 
-                            <button id="zoomOutBtn" class="btn-secondary"
+                            <button id="zoomOutBtn" class="btn-small"
                                     style="padding: 0.4rem 0.6rem; font-size: 1.2rem;" title="Zoom Out">−
                             </button>
                             <span id="zoomLevel"
                                   style="font-size: 0.875rem; min-width: 50px; text-align: center;">100%</span>
-                            <button id="zoomInBtn" class="btn-secondary"
+                            <button id="zoomInBtn" class="btn-small"
                                     style="padding: 0.4rem 0.6rem; font-size: 1.2rem;" title="Zoom In">+
                             </button>
-                            <button id="zoomResetBtn" class="btn-secondary"
-                                    style="padding: 0.4rem 0.8rem; font-size: 0.75rem;" title="Reset Zoom">Reset
-                            </button>
+
                         </div>
                     </div>
-                    <div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--bg-light); border-radius: 4px; font-size: 0.75rem; color: var(--text-light);">
-                        Oryginalny obrazek pokazuje granice województwa. Możesz pobrać ten obraz w wysokiej rozdzielczości.
-                    </div>
+                    <div style="padding: 1rem;">
+  <div style="margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-light); border-radius: 4px; font-size: 0.875rem;">
+    <strong>Opis:</strong> Na obrazie widzisz nałożone granice maski na granice województwa.
+    Możesz pobrać ten obrazek na potrzeby zadania lub dalszej analizy.
+  </div>
+</div>
+
                 </div>
             {% endif %}
         </div>
@@ -167,38 +164,38 @@
 {% block extra_js %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        // Class colors configuration
-        const CLASS_COLORS_RGB = {
-            "AnnualCrop": "rgb(255, 255, 0)",
-            "Forest": "rgb(0, 255, 0)",
-            "HerbaceousVegetation": "rgb(100, 200, 100)",
-            "Highway": "rgb(0, 0, 255)",
-            "Industrial": "rgb(128, 128, 128)",
-            "Pasture": "rgb(0, 200, 0)",
-            "PermanentCrop": "rgb(200, 255, 100)",
-            "Residential": "rgb(255, 255, 255)",
-            "River": "rgb(0, 255, 255)",
-            "SeaLake": "rgb(255, 100, 255)"
-        };
+  const CLASS_COLORS_RGB = {
+    "AnnualCrop": "rgb(0,217,255)",
+    "Forest": "rgb(8,234,16)",
+    "HerbaceousVegetation": "rgb(100, 200, 100)",
+    "Highway": "rgb(255,0,0)",
+    "Industrial": "rgb(80,80,80)",
+    "Pasture": "rgb(82,52,94)",
+    "PermanentCrop": "rgb(0,200,200)",
+    "Residential": "rgb(197,195,195)",
+    "River": "rgb(255,242,0)",
+    "SeaLake": "rgb(255, 100, 255)"
+  };
 
-        window.AppConfig = {
-            hasAnalysis: {% if has_analysis %}true{% else %}false{% endif %},
-            analysesList: {{ analyses_list|safe }},
-            analysesCount: {{ analyses_count }},
-
-            {% if has_analysis %}
-                stats: JSON.parse('{{ stats_json|escapejs }}'),
-                tabs: JSON.parse('{{ tabs_json|escapejs }}'),
-                polandAverages: {{ poland_averages|safe }},
-                wojewodztwoName: '{{ wojewodztwo.name|escapejs }}',
-            {% endif %}
-
-            classColors: CLASS_COLORS_RGB
-        };
+    window.AppConfig = {
+        hasAnalysis: {% if has_analysis %}true{% else %}false{% endif %},
+        analysisId: {% if analysis %}{{ analysis.id }}{% else %}null{% endif %},
+        analysesList: {{ analyses_list|safe }},
+        analysesCount: {{ analyses_count }},
 
         {% if has_analysis %}
-            window.imageData = {{ image_data|safe }};
+            stats: JSON.parse('{{ stats_json|escapejs }}'),
+            tabs: JSON.parse('{{ tabs_json|escapejs }}'),
+            polandAverages: {{ poland_averages|safe }},
+            wojewodztwoName: '{{ wojewodztwo.name|escapejs }}',
         {% endif %}
+
+        classColors: CLASS_COLORS_RGB
+    };
+
+    {% if has_analysis %}
+        window.imageData = {{ image_data|safe }};
+    {% endif %}
     </script>
 
     <script src="{% static 'js/details.js' %}"></script>

@@ -156,10 +156,10 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     }
 
-    modalTitle.textContent = `Configure Analysis: ${nazwa.charAt(0).toUpperCase() + nazwa.slice(1)}`;
+    modalTitle.textContent = `Konfiguracja analizy: ${nazwa.charAt(0).toUpperCase() + nazwa.slice(1)} województwo`;
 
     if (analyzed) {
-      if (confirm(`${nazwa} już było przeanalizowane. Chcesz zobaczyć stronę?`)) {
+      if (confirm(`${nazwa} już było przeanalizowane wczesniej. Chcesz zobaczyć stronę?`)) {
         window.location.href = `/wojewodztwo/${id}/`;
       } else {
         configModal.showModal();

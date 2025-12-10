@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Landcover Analysis Tool{% endblock %}
+{% block title %}Narzędzie do analizy wybranego obszaru{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"/>
@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{% static 'app.css' %}">
 <link rel="stylesheet" href="{% static 'map.css' %}">
 <link rel="stylesheet" href="{% static 'details.css' %}">
+    <link rel="stylesheet" href="{% static 'history.css' %}">
 
 {% endblock extra_css %}
 
@@ -24,7 +25,7 @@
     <h2 style="margin-top: 0;">Analiza statystyczna wybranego obszaru</h2>
 
     <div class="card" id="progressPanel">
-      <h3 style="margin: 0 0 1rem 0;">Progress</h3>
+        <h2 style="margin: 0;">Progres</h2>
       <div class="progress-step pending">wyodrębnianie kafelków mapy</div>
       <div class="progress-step pending">przycinanie obszaru</div>
       <div class="progress-step pending">analiza obszaru</div>
@@ -33,40 +34,47 @@
         <div class="card" id="imagesCard" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
         <h3 style="margin: 0;">Wizualizacja</h3>
-        <div style="display: flex; gap: 0.5rem;">
-          <button id="downloadOriginalBtn" class="btn-secondary" title="Download Original" style="padding: 0.5rem; font-size: 0.875rem; display: none;">Oryginał</button>
-          <button id="downloadMaskBtn" class="btn-secondary" title="Download Mask" style="padding: 0.5rem; font-size: 0.875rem; display: none;">Maska</button>
-        </div>
       </div>
 
-      <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
-        <button class="image-control-btn active" data-view="original">Original</button>
-        <button class="image-control-btn" data-view="mask">Mask</button>
-        <button class="image-control-btn" data-view="blended">Overlay</button>
-      </div>
+<div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+  <button class="image-control-btn active btn-small" data-view="original">Oryginał</button>
+  <button class="image-control-btn btn-small" data-view="mask">Maska</button>
+  <button class="image-control-btn btn-small" data-view="blended">Overlay</button>
+  <button class="image-control-btn btn-small" data-view="residential" id="residentialBtn" style="display: none;">Zabudowa miejska</button>
+</div>
 
-      <div style="position: relative; width: 100%; background: var(--bg-light); border-radius: 4px; overflow: hidden;">
-        <div style="padding-top: 75%;"></div>
-        <div class="image-layer active" data-layer="original"
-             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 1; transition: opacity 0.3s; overflow: auto;">
-          <img id="originalImage" alt="Original" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
-        </div>
-        <div class="image-layer" data-layer="mask"
-             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; overflow: auto;">
-          <img id="maskImage" alt="Classification" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
-        </div>
-        <div class="image-layer" data-layer="blended"
-             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; overflow: auto;">
-          <img id="blendedImage" alt="Overlay" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
-        </div>
-      </div>
+<div style="position: relative; width: 100%; background: var(--bg-light); border-radius: 4px; overflow: hidden;">
+  <button id="downloadActiveBtn"
+          class="image-control-btn download-overlay-btn btn-small"
+          title="Pobierz obraz"
+          style="display: none;">🢃 Pobierz</button>
+
+  <div style="padding-top: 75%;"></div>
+  <div class="image-layer active" data-layer="original"
+       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 1; transition: opacity 0.3s; overflow: auto;">
+    <img id="originalImage" alt="Original" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
+  </div>
+  <div class="image-layer" data-layer="mask"
+       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; overflow: auto;">
+    <img id="maskImage" alt="Classification" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
+  </div>
+  <div class="image-layer" data-layer="blended"
+       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; overflow: auto;">
+    <img id="blendedImage" alt="Overlay" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
+  </div>
+    <div class="image-layer" data-layer="residential"
+       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; overflow: auto;">
+    <img id="residentialImage" alt="Residential Area" style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in;">
+    </div>
+</div>
+
     </div>
     <div class="card" id="statsContainer">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <h3 style="margin: 0;">Statystyki</h3>
         <div style="display: flex; gap: 0.5rem;">
-          <button id="viewRawJsonBtn" class="btn-secondary" title="View Raw JSON" style="padding: 0.5rem; font-size: 1.2rem; display: none;">Raw</button>
-          <button id="downloadJsonBtn" class="btn-secondary" title="Download JSON" style="padding: 0.5rem; font-size: 1.2rem; display: none;">🢃</button>
+          <button id="viewRawJsonBtn" class="json-action- btn-small" title="Pokaż surowe dane" style="display: none;">Raw</button>
+            <button id="downloadJsonBtn" class="json-action-btn btn-small" title="Pobierz JSON" style="display: none;">🢃</button>
         </div>
       </div>
 
@@ -104,24 +112,45 @@
       </p>
     </div>
 
-    <div class="config-group">
-      <label class="checkbox-label">
-        <input id="smoothing" type="checkbox" checked/>
-        <span> Wygładzenie sąsiadowe </span>
-      </label>
-    </div>
+      <div class="config-group">
+          <label class="checkbox-label">
+            <input id="smoothing" type="checkbox" checked/>
+            <span> Wygładzenie sąsiadowe </span>
+          </label>
+        </div>
 
-    <div class="config-group">
-      <label class="checkbox-label">
-        <input id="fixSeaLake" type="checkbox" checked/>
-        <span> Napraw izolowane jeziora </span>
-      </label>
-    </div>
+        <div class="config-group">
+          <label class="checkbox-label">
+            <input id="interpolation" type="checkbox" checked/>
+            <span> Interpolacja prawdopodobieństw </span>
+          </label>
+          <p class="config-help" style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem;">
+            Gładkie przejścia między klasami zamiast kafelków
+          </p>
+        </div>
+
+        <div class="config-group">
+          <label class="checkbox-label">
+            <input id="simplifiedClasses" type="checkbox"/>
+            <span> Uproszczone klasy (8 zamiast 10) </span>
+          </label>
+          <p class="config-help" style="font-size: 0.875rem; color: var(--text-light); margin-top: 0.5rem;">
+            Usuwa Industrial i Highway, łączy Herbaceous z Forest
+          </p>
+        </div>
+        <!-- END NEW -->
+
+        <div class="config-group">
+          <label class="checkbox-label">
+            <input id="fixSeaLake" type="checkbox"/>
+            <span> Napraw izolowane jeziora </span>
+          </label>
+        </div>
   </form>
 
   <div class="modal-controls">
-    <button id="cancelBtn" class="btn-secondary" type="button">Cancel</button>
-    <button id="runAnalyzeBtn" class="btn-primary" type="button">Run Analysis</button>
+    <button id="cancelBtn" class="btn-secondary btn-small" type="button">Odrzuć</button>
+    <button id="runAnalyzeBtn" class="btn-primary btn-small" type="button">Zacznij analizę</button>
   </div>
 </dialog>
 {% endblock content %}
@@ -132,18 +161,35 @@
 
 <script>
   const CLASS_COLORS_RGB = {
-    "AnnualCrop": "rgb(255, 255, 0)",
+    "AnnualCrop": "rgb(0,217,255)",
     "Forest": "rgb(0, 255, 0)",
     "HerbaceousVegetation": "rgb(100, 200, 100)",
-    "Highway": "rgb(0, 0, 255)",
-    "Industrial": "rgb(128, 128, 128)",
+    "Highway": "rgb(255,0,0)",
+    "Industrial": "rgb(80,80,80)",
     "Pasture": "rgb(0, 200, 0)",
     "PermanentCrop": "rgb(200, 255, 100)",
-    "Residential": "rgb(255, 255, 255)",
-    "River": "rgb(0, 255, 255)",
+    "Residential": "rgb(165,165,165)",
+    "River": "rgb(255,242,0)",
     "SeaLake": "rgb(255, 100, 255)"
   };
-  window.AppConfig = { classColors: CLASS_COLORS_RGB };
+
+  const CLASS_NAMES_PL = {
+    "AnnualCrop": "Uprawy jednoroczne",
+    "Forest": "Las",
+    "HerbaceousVegetation": "Roślinność zielna",
+    "Highway": "Drogi",
+    "Industrial": "Tereny przemysłowe",
+    "Pasture": "Pastwiska",
+    "PermanentCrop": "Uprawy wieloletnie",
+    "Residential": "Tereny mieszkalne",
+    "River": "Rzeki",
+    "SeaLake": "Jeziora i morza"
+  };
+
+  window.AppConfig = {
+    classColors: CLASS_COLORS_RGB,
+    classNamesPL: CLASS_NAMES_PL
+  };
 </script>
 
 <script type="module" src="{% static 'js/main.js' %}"></script>

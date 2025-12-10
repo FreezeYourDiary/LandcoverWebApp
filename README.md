@@ -11,10 +11,10 @@ Analyze map areas with ML-based land cover classification.
 2. Create and activate a virtual environment
    python -m venv venv
    source venv/bin/activate
-3. pip install -r requirements.txt
+3. pip install -r [requirements.txt](requirements.txt)
 4. python manage.py migrate
 5. python manage.py runserver
-6. 
+
 ## To run locally
 
 To run app (tiles for analysis), **`.mbtiles` format**.:
@@ -24,13 +24,13 @@ To run app (tiles for analysis), **`.mbtiles` format**.:
 
 Place `.mbtiles` file inside LandCoverWebApp/data/raw
 
-## ⚙️ Requirements
+## Requirements
 developed with
-- dataset "https://github.com/phelber/EuroSAT?tab=readme-ov-file"
+- dataset: https://github.com/phelber/EuroSAT?tab=readme-ov-file
 - python 3.12
-- Django 5.2.7 "https://www.djangoproject.com/"
-- leaflet.js "https://leafletjs.com/"
-- geojson polish from https://github.com/ppatrzyk/polska-geojson 
+- Django 5.2.7: https://www.djangoproject.com/
+- leaflet.js: https://leafletjs.com/
+- Polish geojson borders: https://github.com/ppatrzyk/polska-geojson 
  
-[requirements.txt](requirements.txt)
+
 

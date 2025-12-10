@@ -12,16 +12,21 @@ Web app for analyzing selected areas on a map, including land cover statistics, 
 ## Model trained
 A set of convolutional neural networks was used for general classification of satellite images.  
 Selected neural networks (own CNN, Mobilenetv2) training, and evaluating individual models.
-![accuracy_plot.png](screenshots/accuracy_plot.png) ![confusion_matrix.png](screenshots/confusion_matrix.png)
+
+
+<img src="screenshots/accuracy_plot.png" width="400" height="400" alt="accuracy.png">
+<img src="screenshots/confusion_matrix.png" width="400" height="400" alt="confsion.png">
+
+
 ## LandcoverWebAppView
 
-## Assets included
+## Assets 
 - `Classifier/inputs/networks/` – pre-trained neural networks
 - `data/` – example image tiles / mbtiles
 - `static`
   - `geodata`
-  - `js/` – frontend logic
-  - `css/` – styles
+  - `.js/` – frontend logic
+  - `.css/` – styles
   - `.html` / Django templates – main UI
 
 
@@ -29,12 +34,14 @@ Selected neural networks (own CNN, Mobilenetv2) training, and evaluating individ
 
 ### Map, UI
 ![ui.png](screenshots/ui.png)
-Config & history with analysis panel
-![ui2.png](screenshots/ui2.png)
+
+### Config & History with Analysis Panel
+<img src="screenshots/ui2.png" width="400" alt="ui2.png">
+<img src="screenshots/history.png" width="400" alt="history.png">
+
 ### Statistics Panel
 ![stats.png](screenshots/stats.png)
+
 ### Analysis
 ![ui3.png](screenshots/ui3.png)
 ![woj.png](screenshots/woj.png)
-
-## Assets

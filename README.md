@@ -1,5 +1,5 @@
 # My Map Analysis Tool
-Analyze map areas with ML-based land cover classification.
+Analyze map areas with CNN-based land cover classification.
 
 ![woj.png](screenshots/woj.png)
 

@@ -1,4 +1,4 @@
-# My Map Analysis Tool
+# LandcoverWebApp - map analysis tool
 Analyze map areas with CNN-based land cover classification.
 
 ![woj.png](screenshots/woj.png)
